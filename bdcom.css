@@ -1,0 +1,24 @@
+/* main styles */
+
+.mac_address {
+	color: black;
+	font-family: Courier;
+	text-decoration: none;
+}
+
+#element_to_pop_ping { 
+    background-color:#fff;
+    border-radius:5px;
+    color:#000;
+    display:none; 
+    padding:2px;
+    min-width:400px;
+    min-height: 400px;
+	max-height: 400px;
+}
+.b-close{
+    cursor:pointer;
+    position:absolute;
+    right:10px;
+    top:5px;
+}

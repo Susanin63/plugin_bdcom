@@ -449,7 +449,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 										//strlen($_REQUEST["o_filter"]) ? preg_replace("/(" . preg_quote($_REQUEST["o_filter"]) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $onu["epon_name"]) : " <a class='linkEditMain' href=bdcom_view_onus.php?report=epons&e_device_id=" . $onu['device_id'] . "&e_port_number=" . $onu["epon_index"]
 										 
 										// 	form_selectable_cell((strlen($_REQUEST["o_filter"]) ? preg_replace("/(" . preg_quote($_REQUEST["o_filter"]) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $onu["epon_name"]) : " <a class='linkEditMain' href=bdcom_view_onus.php?report=epons&e_device_id=" . $onu['device_id'] . "&e_port_number=" . $onu["epon_index"]) . ">" . $onu["epon_name"] . 
-											//" <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_ip_view.php?action=preview&host_id=" . $onu['id'] . "&snmp_index=" . $onu["epon_index"] . "&filter=") . "'><img src='" . $webroot . "images/view_graphs.gif' border='0' alt='' title='View Graph' align='absmiddle'></a>", $onu["onu_id"] );
+											//" <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_ion_view.php?action=preview&host_id=" . $onu['id'] . "&snmp_index=" . $onu["epon_index"] . "&rfilter=") . "'><img src='" . $webroot . "images/view_graphs.gif' border='0' alt='' title='View Graph' align='absmiddle'></a>", $onu["onu_id"] );
 										 
 										 
 						$dev_info .= "</td>\n";	

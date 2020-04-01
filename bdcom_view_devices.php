@@ -420,7 +420,7 @@ function bdcom_view_get_device_records(&$sql_where, $rows = '30', $apply_limits 
 
 	form_start('bdcom_view_devices.php?header=false');
 
-	html_start_box($devices_actions[get_request_var('drp_action')], '60%', '', '3', 'center', '');     
+	html_start_box($device_actions[get_request_var('drp_action')], '60%', '', '3', 'center', '');     
  
  
      if (get_request_var('drp_action') == "5") {  /* Update Info */

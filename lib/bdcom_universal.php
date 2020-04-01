@@ -175,7 +175,7 @@
 		$ifOnus[$key]["distance"] = $onuDistance[$ifOnu["ifIndex"]];
 		$ifOnus[$key]["alive_time"] = $onuAliveTime[$ifOnu["ifIndex"]];
 		$ifOnus[$key]["TxPower1"] = (isset($eponTxPower1[$ifOnu["ifIndex"]]) ? $eponTxPower1[$ifOnu["ifIndex"]] : null);
-		$ifOnus[$key]["temper"] = $onuTemper[$ifOnu["ifIndex"]]/256;
+		$ifOnus[$key]["temper"]   = (isset($onuTemper[$ifOnu["ifIndex"]]) ? $onuTemper[$ifOnu["ifIndex"]]/256 : 0);
 		$ifOnus[$key]["rx_power"] = (isset($onuRxPower[$ifOnu["ifIndex"]]) ? $onuRxPower[$ifOnu["ifIndex"]] : 0);		
 		$ifOnus[$key]["tx_power"] = (isset($onuTxPower[$ifOnu["ifIndex"]]) ? $onuTxPower[$ifOnu["ifIndex"]] : 0);
 		$ifOnus[$key]["onuDeregDescr"] = (isset($onuDeregDescr[$ifOnus[$key]["bindepon"] . "." . bdcom_mac_16_to_10($ifOnus[$key]["mac"])]) ? $onuDeregDescr[$ifOnus[$key]["bindepon"] . "." . bdcom_mac_16_to_10($ifOnus[$key]["mac"])] : "255");

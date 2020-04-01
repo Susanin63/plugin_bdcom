@@ -457,6 +457,7 @@ switch (get_request_var('action')) {
  
  	draw_edit_form(array(
  		"config" => array("form_name" => "chk"),
+		"config" => array("no_form_tag" => true),
  		"fields" => inject_form_variables($fields_bdcom_device_edit, (isset($device) ? $device : array()))
  		));
  

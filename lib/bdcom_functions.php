@@ -59,14 +59,14 @@
  	} 
  }
  /* register this functions scanning functions */
- function bdcom_debug($message) {
+ function bdcom_debug($message, $is_log = false) {
  	global $bdcom_debug;
  
  	if ($bdcom_debug) {
  		print("bdcom_DEBUG (" . date("H:i:s") . "): [" . $message . "]\n");
  	}
  
- 	if ((substr_count($message, "ERROR:")) or ($bdcom_debug)) {
+ 	if ((substr_count($message, "ERROR:")) or ($bdcom_debug) or ($is_log)) {
  		cacti_log($message, false, "bdcom");
  	}
  }
@@ -93,29 +93,35 @@
      $host_up = FALSE;
      $device["snmp_status"] = HOST_DOWN;
  
-     /* force php to return numeric oid's */
-     if (function_exists("snmp_set_oid_numeric_print")) {
-         snmp_set_oid_numeric_print(TRUE);
-     }
-	#http://bugs.cacti.net/view.php?id=2296
-	if (function_exists("snmp_set_oid_output_format")) {
-			snmp_set_oid_output_format(SNMP_OID_OUTPUT_NUMERIC);
-	}	
+	/* force php to return numeric oid's */
+	cacti_oid_numeric_format();
  
-     /* if the first read did not work, loop until found */
- 	$snmp_sysObjectID = @bdcom_snmp_get($device["hostname"], $device["snmp_get_community"], ".1.3.6.1.2.1.1.2.0", $device["snmp_get_version"], $device["snmp_get_username"], $device["snmp_get_password"], $device["snmp_get_auth_protocol"], $device["snmp_get_priv_passphrase"], $device["snmp_get_priv_protocol"],  $device["snmp_get_context"],$device["snmp_port"], $device["snmp_timeout"], $device["snmp_retries"], SNMP_WEBUI);
- 	
-     $snmp_sysObjectID = str_replace("enterprises", ".1.3.6.1.4.1", $snmp_sysObjectID);
-     $snmp_sysObjectID = str_replace("OID: ", "", $snmp_sysObjectID);
-     $snmp_sysObjectID = str_replace(".iso", ".1", $snmp_sysObjectID);
  
-     if ((strlen($snmp_sysObjectID) > 0) &&
-         (!substr_count($snmp_sysObjectID, "No Such Object")) &&
-         (!substr_count($snmp_sysObjectID, "Error In"))) {
-         $snmp_sysObjectID = trim(str_replace("\"","", $snmp_sysObjectID));
-         $host_up = TRUE;
-         $device["snmp_status"] = HOST_UP;
-     }
+ 	$session = cacti_snmp_session($device['hostname'], $device['snmp_get_community'], $device['snmp_get_version'],
+		$device['snmp_get_username'], $device['snmp_get_password'], $device['snmp_get_auth_protocol'], $device['snmp_get_priv_passphrase'],
+		$device['snmp_get_priv_protocol'], $device['snmp_get_context'], '', $device['snmp_port'],
+		$device['snmp_timeout']);
+
+		if ($session !== false) {
+			/* Community string is not used for v3 */
+			$snmp_sysObjectID = cacti_snmp_session_get($session, '.1.3.6.1.2.1.1.2.0');
+
+			if ($snmp_sysObjectID != 'U') {
+				$snmp_sysObjectID = str_replace('enterprises', '.1.3.6.1.4.1', $snmp_sysObjectID);
+				$snmp_sysObjectID = str_replace('OID: ', '', $snmp_sysObjectID);
+				$snmp_sysObjectID = str_replace('.iso', '.1', $snmp_sysObjectID);
+
+				if ((strlen($snmp_sysObjectID)) &&
+					(!substr_count($snmp_sysObjectID, 'No Such Object')) &&
+					(!substr_count($snmp_sysObjectID, 'Error In'))) {
+					$snmp_sysObjectID = trim(str_replace('"', '', $snmp_sysObjectID));
+					$device['snmp_status'] = HOST_UP;
+					$host_up = true;
+				}
+			}
+		}
+ 
+
  
      if ($host_up) {
          $device["snmp_sysObjectID"] = $snmp_sysObjectID;
@@ -237,7 +243,7 @@ function bdcom_snmp_get($hostname, $community, $oid, $version, $username, $passw
 		}
 
 		if ($snmp_value === false) {
-			cacti_log("WARNING: bdcom SNMP Get Timeout for Host:'$hostname', and OID:'$oid'", false);
+			cacti_log("WARNING: bdcom SNMP Get Timeout for Device[$hostname], and OID:'$oid'", false);
 		}
 	}else {
 		$snmp_value = '';
@@ -303,7 +309,7 @@ function bdcom_snmp_get($hostname, $community, $oid, $version, $username, $passw
 	}
 
 	if (substr_count($snmp_value, "Timeout:")) {
-		cacti_log("WARNING: bdcom SNMP Get Timeout for Host:'$hostname', and OID:'$oid'", false);
+		cacti_log("WARNING: bdcom SNMP Get Timeout for Device[$hostname], and OID:'$oid'", false);
 	}
 
 	/* strip out non-snmp data */
@@ -353,7 +359,7 @@ function bdcom_snmp_get_hex($hostname, $community, $oid, $version, $username, $p
 		}
 
 		if ($snmp_value === false) {
-			cacti_log("WARNING: bdcom SNMP Get Timeout for Host:'$hostname', and OID:'$oid'", false);
+			cacti_log("WARNING: bdcom SNMP Get Timeout for Device[$hostname], and OID:'$oid'", false);
 		}
 	}else {
 		$snmp_value = '';
@@ -419,7 +425,7 @@ function bdcom_snmp_get_hex($hostname, $community, $oid, $version, $username, $p
 	}
 
 	if (substr_count($snmp_value, "Timeout:")) {
-		cacti_log("WARNING: bdcom SNMP Get Timeout for Host:'$hostname', and OID:'$oid'", false);
+		cacti_log("WARNING: bdcom SNMP Get Timeout for Device[$hostname], and OID:'$oid'", false);
 	}
 	//fix incorect hex 
 	if (substr(strtolower($snmp_value), 0, 4) == 'hex-') {
@@ -474,7 +480,7 @@ function bdcom_snmp_get_ucd($hostname, $community, $oid, $version, $username, $p
 		}
 
 		if ($snmp_value === false) {
-			cacti_log("WARNING: bdcom SNMP Get Timeout for Host:'$hostname', and OID:'$oid'", false);
+			cacti_log("WARNING: bdcom SNMP Get Timeout for Device[$hostname], and OID:'$oid'", false);
 		}
 	}else {
 		$snmp_value = '';
@@ -540,7 +546,7 @@ function bdcom_snmp_get_ucd($hostname, $community, $oid, $version, $username, $p
 	}
 
 	if (substr_count($snmp_value, "Timeout:")) {
-		cacti_log("WARNING: bdcom SNMP Get Timeout for Host:'$hostname', and OID:'$oid'", false);
+		cacti_log("WARNING: bdcom SNMP Get Timeout for Device[$hostname], and OID:'$oid'", false);
 	}
 
 	/* strip out non-snmp data */
@@ -628,7 +634,7 @@ function bdcom_snmp_walk($hostname, $community, $oid, $version, $username, $pass
 		}
 
 		if ($temp_array === false) {
-			cacti_log("WARNING: bdcom SNMP Walk Timeout for Host:'$hostname', and OID:'$oid'", false);
+			cacti_log("WARNING: bdcom SNMP Walk Timeout for Device[$hostname], and OID:'$oid'", false);
 		}
 
 		/* check for bad entries */
@@ -647,8 +653,6 @@ function bdcom_snmp_walk($hostname, $community, $oid, $version, $username, $pass
 		for (@reset($temp_array); $i = @key($temp_array); next($temp_array)) {
 			if ($temp_array[$i] != "NULL") {
 				$snmp_array[$o]["oid"] = preg_replace("/^\./", "", $i);
-				// "Hex-STRING:" will not tedect as hex in /lib/functions:is_hex_string, so replace it to "Hex:STRING:" 
-				//$snmp_array[$o]["value"] = format_snmp_string(preg_replace("/Hex-STRING:/i","Hex:STRING:",$temp_array[$i]), $snmp_oid_included);
 				$snmp_array[$o]["value"] = format_snmp_string($temp_array[$i], $snmp_oid_included);
 			}
 			$o++;
@@ -704,7 +708,7 @@ function bdcom_snmp_walk($hostname, $community, $oid, $version, $username, $pass
 		}
 
 		if (substr_count(implode(" ", $temp_array), "Timeout:")) {
-			cacti_log("WARNING: bdcom SNMP Walk Timeout for Host:'$hostname', and OID:'$oid'", false);
+			cacti_log("WARNING: bdcom SNMP Walk Timeout for Device[$hostname], and OID:'$oid'", false);
 		}
 
 		/* check for bad entries */
@@ -813,7 +817,7 @@ function bdcom_snmp_walk_usdbin($hostname, $community, $oid, $version, $username
 		}
 
 		if ($temp_array === false) {
-			cacti_log("WARNING: bdcom SNMP Walk Timeout for Host:'$hostname', and OID:'$oid'", false);
+			cacti_log("WARNING: bdcom SNMP Walk Timeout for Device[$hostname], and OID:'$oid'", false);
 		}
 
 		/* check for bad entries */
@@ -887,7 +891,7 @@ function bdcom_snmp_walk_usdbin($hostname, $community, $oid, $version, $username
 		}
 
 		if (substr_count(implode(" ", $temp_array), "Timeout:")) {
-			cacti_log("WARNING: bdcom SNMP Walk Timeout for Host:'$hostname', and OID:'$oid'", false);
+			cacti_log("WARNING: bdcom SNMP Walk Timeout for Device[$hostname], and OID:'$oid'", false);
 		}
 
 		/* check for bad entries */
@@ -1387,7 +1391,7 @@ function bdcom_db_store_device_onu_results(&$device, $onu_array, $scan_date) {
 					$onu["alive_time"] . "','" . 
 					$onu["onuDeregDescr"] . "','" . 
 					"CRT" . "','" .				//onu_done_reason
-					"0" . "','" .				//onu_aclist
+					$onu["onu_aclist"] . "','" .				//onu_aclist
 					"1" . "','" .				//onu_online
 					$scan_date . "')";
 
@@ -1656,7 +1660,7 @@ function bdcom_db_store_device_onu_off_results(&$device, $onu_array, $scan_date)
  	if ($max_autosave_count > 0){
  		$unsaved_operations = db_fetch_cell ("SELECT count_unsaved_actions FROM plugin_bdcom_devices WHERE device_id=" . $device_id . ";");
  	  	if (($unsaved_operations + $count_opertions) >= $max_autosave_count) {
- 	  		db_store_imp_log("Выполняеться автосохранение текущей кофигурации", "device", $device_id, "auto_save",$device_id, "OK","OK", "OK", "OK");
+ 	  		db_store_bdcom_log("Выполняеться автосохранение текущей кофигурации", "device", $device_id, "auto_save",$device_id, "OK","OK", "OK", "OK");
  	      bdcom_save_config_main($device_id);
  	  	} else {
  	  		db_execute("UPDATE `imb_devices` SET count_unsaved_actions=count_unsaved_actions + " . $count_opertions . " where device_id=" . $device_id );
@@ -1750,8 +1754,6 @@ function bdcom_db_store_device_onu_off_results(&$device, $onu_array, $scan_date)
  				}			
 			}
  		
- 		//imp_raise_message2($message, $device, $message_rezult_short, $message_rezult, $check_rezult_short, $check_rezult) {
- 		//imp_raise_message2 ($message , $device, $rezult["rez_step"], $rezult["step_data"], $rezult["check_rez"], $rezult["check_data"]);
  		if (isset($device["dev_name"])) {
  			$dev_name = $device["dev_name"];
  		}else{
@@ -1759,7 +1761,7 @@ function bdcom_db_store_device_onu_off_results(&$device, $onu_array, $scan_date)
  		}
  		$rezult["mes_id"] = bdcom_raise_message3(array("device_descr" => $dev_name, "type" => "action_check", "object"=>$type_change,"cellpading" => $cellpading, "message" => $message, "step_data" => $rezult["step_data"], "step_rezult" => $rezult["step_rez"], "check_data" => $rezult["check_data"], "check_rezult" => $rezult["check_rez"]));     
  
- 		//db_store_imp_log($message, "ipmac", $macip_id, "change",$device_id, imb_check_mes_create_ipmac_s1_check($step1,$mac_adrress), $step1, imb_check_mes_create_ipmac_s1($check_step1, $mac_adrress ), $check_step1);
+ 		//db_store_bdcom_log($message, "ipmac", $macip_id, "change",$device_id, imb_check_mes_create_ipmac_s1_check($step1,$mac_adrress), $step1, imb_check_mes_create_ipmac_s1($check_step1, $mac_adrress ), $check_step1);
  	return $rezult;
  }
  
@@ -1809,7 +1811,7 @@ function bdcom_db_store_vlans_results(&$device, $vlans_array, $scan_date) {
 
 
  
- function db_store_imp_log($log_poller,$log_device_id,$log_object,$log_object_id,$log_old_value,$log_new_value,$log_message,$log_rezult_short=0,$log_rezult=0,$log_check_rezult_short=0,$log_check_rezult=0) {
+ function db_store_bdcom_log($log_poller,$log_device_id,$log_object,$log_object_id,$log_old_value,$log_new_value,$log_message,$log_rezult_short=0,$log_rezult=0,$log_check_rezult_short=0,$log_check_rezult=0) {
  //если поллер
  if (!(isset($_SESSION["sess_user_id"]))) {
 	$_SESSION["sess_user_id"] = 0;
@@ -2000,41 +2002,6 @@ function bdcom_convert_port_type_2_html($port_type) {
 
 
 
-
-
-
-
-
-
- 
- /* raise_message - mark a message to be displayed to the user once display_output_messages() is called
-    @arg $message_id - the ID of the message to raise as defined in $messages in 'include/config_arrays.php' */
- function imp_raise_message($message, $device, $message_rezult, $check_rezult) {
-     $mes_id = 0;
- 	if (isset($_SESSION["bdcom_output_messages"])) {
-         $mes_id = count($_SESSION["bdcom_output_messages"]) + 1;
-     }
- 	$_SESSION["bdcom_output_messages"][$mes_id]["message"] = $message;
- 	$_SESSION["bdcom_output_messages"][$mes_id]["device_hostname"] = $device["hostname"];
- 	$_SESSION["bdcom_output_messages"][$mes_id]["message_rezult"] = $message_rezult;
- 	$_SESSION["bdcom_output_messages"][$mes_id]["check_rezult"] = $check_rezult;
- }
- 
- function imp_raise_message2($message, $device, $message_rezult_short, $message_rezult, $check_rezult_short, $check_rezult) {
-     $mes_id = 0;
- 	if (isset($_SESSION["bdcom_output_messages"])) {
-         $mes_id = count($_SESSION["bdcom_output_messages"]) + 1;
-     }
- 	$_SESSION["bdcom_output_messages"][$mes_id]["message"] = $message;
- 	$_SESSION["bdcom_output_messages"][$mes_id]["device_hostname"] = $device["hostname"];
- 	$_SESSION["bdcom_output_messages"][$mes_id]["message_rezult_short"] = $message_rezult_short;
- 	$_SESSION["bdcom_output_messages"][$mes_id]["message_rezult"] = $message_rezult;
- 	$_SESSION["bdcom_output_messages"][$mes_id]["check_rezult_short"] = $check_rezult_short;
- 	$_SESSION["bdcom_output_messages"][$mes_id]["check_rezult"] = $check_rezult;
- 	
- }
- 
- 
  //bdcom_raise_message3(array(type => "title",leftmargin => '0', message => 'Старт'));     
  //bdcom_raise_message3(array(device_descr => "Свича", type => "action_check",leftmargin => "10", message => "шаг 1", step_data => "10", step_rezult => "OK", check_data => "20", check_rezult => "Error"));     
  
@@ -2468,6 +2435,16 @@ function update_onu_firm($onu_id){
 
 function bdcom_color_power_cell($onu){
 	
+
+	$str_power=bdcom_color_power($onu);
+
+	$str_power = '<div class="fit_div" id=pw' . $onu["onu_id"] . '>' . $str_power . '</div>';
+	//$str_power = $str_power;
+	return $str_power;
+}
+
+function bdcom_color_power($onu){
+	
 	
 	if ($onu["onu_rxpower"] > -100) {
 		$onu_rx_pow = "<span style='background-color: #f7dc6f ;'>" . round($onu["onu_rxpower"]*0.1,1) ."</span>";
@@ -2489,9 +2466,8 @@ function bdcom_color_power_cell($onu){
 		$str_power    ="[" . $str_power . "]";
 	}
 	
-	$str_power = '<div id=pw' . $onu["onu_id"] . '>' . $str_power . '</div>';
-	//$str_power = $str_power;
 	return $str_power;
+
 }
 
  function bdcom_array_strip_non_digital($array) {
@@ -2555,16 +2531,134 @@ function bdcom_convert_macip_state_2str($macip_state) {
  		break;	
  	}
  		return $str_macip_state;
- }
+}
 
+function bdcom_convert_macip_action_2str($macip_action, $type_conversion_action) {
+ 	if ($macip_action == -1) {
+ 		$str_macip_action = "<span style='color: #a1a1a1'>unUse</span>";
+ 	}else{
+ 		switch($type_conversion_action) {
+ 		case 1:
+ 				switch($macip_action) {
+ 					case 1:
+ 						$str_macip_action = "<span style='color: #750F7D'>inactive(1)</span>";
+ 						break;
+ 					case 2:
+ 						$str_macip_action = "<span style='color: #198e32'>active(2)</span>";
+ 						break;
+ 					default:
+ 						$str_macip_action = "<span style='color: #750F7D'>unk(" . $macip_action .")</span>";
+ 						break;						
+ 				}
+ 		break;
+ 		case 2:
+ 				switch($macip_action) {
+ 					case 0:
+ 						$str_macip_action = "<span style='color: #750F7D'>inactive(0)</span>";
+ 						break;
+ 					case 1:
+ 						$str_macip_action = "<span style='color: #198e32'>active(1)</span>";
+ 						break;
+ 					default:
+ 						$str_macip_action = "<span style='color: #750F7D'>unk(" . $macip_action .")</span>";
+ 						break;						
+ 				}		
+ 		break;
+ 		default:
+ 			$str_macip_action = "<span style='color: #750F7D'>unk(" . $macip_action .")</span>";
+ 			break;
+ 		}
+ 	}
+ 		return $str_macip_action;
+}
+
+function bdcom_convert_macip_mode_2str_full($macip_mode, $device_id) {
+ $macip_mode_str = bdcom_convert_macip_mode_2str($macip_mode, $device_id);
+ switch($macip_mode_str) {
+ 	case 'ARP':
+ 		$imp_convert_macip_mode_2str_full = "<span style='color: #198e32'>ARP(" . $macip_mode . ")</span>";
+ 		break;
+ 	case 'ACL':
+ 		$imp_convert_macip_mode_2str_full = "<span style='color: #750F7D'>ACL(" . $macip_mode . ")</span>";
+ 		break;
+ 	case 'unUse':
+ 		$imp_convert_macip_mode_2str_full = "<span style='color: #a1a1a1'>unUse</span>";
+ 		break;
+ 	default:
+ 		$imp_convert_macip_mode_2str_full = "<span style='color: #750F7D'>unk(" . $macip_mode .")</span>";
+ 		break;		
+ }
+ return $imp_convert_macip_mode_2str_full;
+} 
+
+
+function bdcom_convert_macip_mode_2str($macip_mode, $device_id) {
+ $type_conversion_mode = db_fetch_cell ("SELECT imb_device_types.type_imb_mode FROM imb_devices " . 
+ 	" left JOIN imb_device_types ON imb_devices.device_type_id = imb_device_types.device_type_id " .
+ 	" where device_id=" . $device_id . ";");
+ 	if ($macip_mode == -1) {
+ 		$str_macip_mode = "unUse";
+ 	}else{
+ 		switch($type_conversion_mode) {
+ 		case 1:
+ 				switch($macip_mode) {
+ 					case 1:
+ 						$str_macip_mode = "ARP";
+ 						break;
+ 					case 2:
+ 						$str_macip_mode = "ACL";
+ 						break;
+ 					default:
+ 						$str_macip_mode = "unk";
+ 						break;						
+ 				}
+ 		break;
+ 		case 2:
+ 				switch($macip_mode) {
+ 					case 0:
+ 						$str_macip_mode = "ARP";
+ 						break;
+ 					case 1:
+ 						$str_macip_mode = "ACL";
+ 						break;
+ 					default:
+ 						$str_macip_mode = "unk";
+ 						break;						
+ 				}		
+ 		break;
+ 		default:
+ 			$str_macip_mode = "unk";
+ 			break;
+ 		}
+ 	}
+ 		return $str_macip_mode;
+}
+ 
+function bdcom_convert_free_2str($macip_free) {
+ 	switch($macip_free) {
+ 	case 0:
+       $str_macip_state = "<span style='color: #750F7D'>off(0)</span>";
+ 	  break;
+ 	case 1:
+       $str_macip_state = "<span style='color: #198e32'>ON(1)</span>";
+ 	  break;	  
+ 	default:
+ 		$str_macip_state = "<span style='color: #750F7D'>unk(" . $macip_state .")</span>";
+ 		break;	
+ 	}
+ 		return $str_macip_state;
+}
+ 
+ 
  function send_viber_msg($str_msg, $tel = "+79377999153 +79377999152"){
 	
 	$ar_tel=preg_split("/[\s,]+/",$tel);
 
 	foreach($ar_tel as $key => $t) {
 		db_execute("INSERT INTO sms.outbox (SendBefore,SendAfter,DestinationNumber, TextDecoded, CreatorID, Coding, SenderID) VALUES ('22:00:00','9:00:00','" . $t . "' , '" . $str_msg . "' , 'sys_bdcom', 'Default_No_Compression','0');");	
-		bdcom_debug("BDCOM ERROR: SEND MSG =[" . $str_msg . "] and  T=[" . $t . "] and TEL=[" . $tel . "] ");					
+		//bdcom_debug("BDCOM ERROR: SEND MSG =[" . $str_msg . "] and  T=[" . $t . "] and TEL=[" . $tel . "] ");					
 	}
+	bdcom_debug($str_msg, true);					
 	//Yasha
 	//db_execute("INSERT INTO sms.outbox (SendBefore,SendAfter,DestinationNumber, TextDecoded, CreatorID, Coding, SenderID) VALUES ('22:00:00','9:00:00','+79372068684' , '" . $str_msg . "' , 'sys_bdcom', 'Default_No_Compression','0');");		
 } 
@@ -2579,13 +2673,26 @@ function bdcom_alert_rxpower_change($device){
 		
 
 		if (sizeof($ar_onus) > 0) {
+			if (sizeof($ar_onus) < 6) {
+				sleep (7);
+			}
 			foreach ($ar_onus as $key => $val) {
-				$str_sms = "ONU RX CHANGE! IP=" . $val["onu_ipaddr"] . " RX=" . round($val["onu_rxpower"]/10,1) . ". AVG=" . round($val["onu_rxpower_average"]/10,1) . "  https://sys.ion63.ru/graph_vg_view.php?uid=" . $val["uid"] ;
-				send_viber_msg($str_sms);
-				//$results1 = print_r($val, true);
-				//cacti_log("BDCOM ERROR = " . print_r($val, true), false, "bdcom_er");
-				//cacti_log("BDCOM ERROR_2 = " . print_r($ar_onus, true), false, "bdcom_er2");
-				db_execute("UPDATE plugin_bdcom_onu SET `onu_rxpower_alert_date`=NOW() WHERE `onu_id`='" . $val["onu_id"] . "';");		
+				//если онушек меньше 5 - попробуем перепроверить уровень
+				if (sizeof($ar_onus) < 6) {
+					sleep (1);
+					$onu=update_onu_power($val["onu_id"]);
+					//db_execute("UPDATE plugin_bdcom_onu SET `onu_txpower`='" . $onuTxPower . "', `onu_rxpower`='" . $onuRxPower . "', `onu_scan_date`='" . date('Y-m-d H:i:s') . "'  WHERE `onu_id`='" . $onu_id . "';");
+					cacti_log("WARNING: ONU RX RESTORE! IP=" . $onu["onu_ipaddr"] . " RX=" . round($onu["onu_rxpower"]/10,1) . ". WAS=" . round($val["onu_rxpower"]/10,1));
+					$val["onu_rxpower"] = $onu["onu_rxpower"];					
+				}
+				if ((ABS(($val["onu_rxpower"]/$val["onu_rxpower_average"]) - 1)*100) > 10) {
+					$str_sms = "WARNING: ONU RX CHANGE! IP=" . $val["onu_ipaddr"] . " RX=" . round($val["onu_rxpower"]/10,1) . ". AVG=" . round($val["onu_rxpower_average"]/10,1) . "  https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $val["onu_ipaddr"] ;
+					send_viber_msg($str_sms);
+					//$results1 = print_r($val, true);
+					cacti_log($str_sms);
+					//cacti_log("BDCOM ERROR_2 = " . print_r($ar_onus, true), false, "bdcom_er2");
+					db_execute("UPDATE plugin_bdcom_onu SET `onu_rxpower_alert_date`=NOW() WHERE `onu_id`='" . $val["onu_id"] . "';");		
+				}
 			}
 		}
 	}
@@ -2982,7 +3089,7 @@ function bdcom_isJson($string) {
  $bol_reverse = false;
  $port_string = "";
 
-	$xport = str_replace(':','',$xport);
+	$xport = str_replace(array(':',' '),'',$xport);
 	$arr_xport = str_split($xport);
 
 	 foreach ($arr_xport as $str_xport) {
@@ -3005,8 +3112,16 @@ function bdcom_isJson($string) {
 	 $i = 0;
 	 $str_rezult = "";
 	 $last_symbol="";
+	 
+// $arr_rezult
+// : array = 
+  // 0: long = 1
+  // 1: long = 7
+  // 2: long = 8
+  // 3: long = 13
+  
 	 foreach ($arr_rezult as $r){
-		if ($r == ($arr_rezult[$i+1]-1)) {
+		if (isset($arr_rezult[$i+1]) and $r == ($arr_rezult[$i+1]-1)) {
 			if (($last_symbol == ",") || ($last_symbol == "")) {
 				$str_rezult .= $r . "-";
 				$last_symbol = "-";
@@ -3027,6 +3142,64 @@ function bdcom_isJson($string) {
  
  return $arr_finish;
  }
+
+ function bdcom_convert_hex_to_view_string2($xport) {
+ $bol_reverse = false;
+ $port_string = "";
+
+	$xport = str_replace(array(':',' '),'',$xport);
+	$arr_xport = str_split($xport,4);
+
+	 foreach ($arr_xport as $str_xport) {
+		 $port_string = $port_string . sprintf("%04b", hexdec($str_xport));
+	 }
+	 
+	 //$arr_port = str_split($port_string);
+	 $arr_port = array_keys ( str_split($port_string) , '1');
+	 
+	 //$arr_port = array_splice($arr_port,27);
+	 $arr_rezult=array();
+	 foreach ($arr_port as $key => $value) {
+			array_push($arr_rezult, $value+1);
+	 }
+	 $port_list = implode(",", $arr_rezult);
+	 /*next, create port View*/
+	 //array_push($arr_rezult, 255);
+	 //$size_arr_rezult = sizeof($arr_rezult)-1;
+	 $i = 0;
+	 $str_rezult = "";
+	 $last_symbol="";
+	 
+// $arr_rezult
+// : array = 
+  // 0: long = 1
+  // 1: long = 7
+  // 2: long = 8
+  // 3: long = 13
+  
+	 foreach ($arr_rezult as $r){
+		if (isset($arr_rezult[$i+1]) and $r == ($arr_rezult[$i+1]-1)) {
+			if (($last_symbol == ",") || ($last_symbol == "")) {
+				$str_rezult .= $r . "-";
+				$last_symbol = "-";
+			}
+		}else{
+			$str_rezult .= $r . ",";
+			$last_symbol = ",";
+		}
+		
+		$i++;
+	 };
+	 $port_view = substr($str_rezult, 0, strlen($str_rezult)-1);
+	 $arr_finish=array();
+ 
+ $arr_finish["port_view"]=$port_view;
+ $arr_finish["port_list"]=$port_list;
+ $arr_finish["port_arr"]=$arr_rezult;
+ 
+ return $arr_finish;
+ }
+
  
  function bdcom_autoupdate_22b() {
 	$str_ids = '';
@@ -3070,6 +3243,34 @@ function bdcom_isJson($string) {
 	}
 	
  
+}
+
+/* form_alternate_row - starts an HTML row with an alternating color scheme
+   @arg $light - Alternate odd style
+   @arg $row_id - The id of the row
+   @arg $reset - Reset to top of table */
+function bdcom_form_alternate_row($row_id = '', $light = false, $disabled = false, $style='') {
+	static $i = 1;
+
+	if ($i % 2 == 1) {
+		$class = 'odd';
+	} elseif ($light) {
+		$class = 'even-alternate';
+	} else {
+		$class = 'even';
+	}
+
+	$i++;
+
+	if ($row_id != '' && !$disabled && substr($row_id, 0, 4) != 'row_') {
+		print "<tr class='$class selectable tableRow' " . (strlen($style) ? " style='$style;'" : "") . " id='$row_id'>\n";
+	} elseif (substr($row_id, 0, 4) == 'row_') {
+		print "<tr class='$class tableRow'  " . (strlen($style) ? " style='$style;'" : "") . "  id='$row_id'>\n";
+	} elseif ($row_id != '') {
+		print "<tr class='$class tableRow'  " . (strlen($style) ? " style='$style;'" : "") . "  id='$row_id'>\n";
+	} else {
+		print "<tr class='$class  " . (strlen($style) ? " style='$style;'" : "") . "  tableRow'>\n";
+	}
 }
  
  ?>

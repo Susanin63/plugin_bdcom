@@ -25,19 +25,22 @@
  *******************************************************************************/
 
 function plugin_bdcom_install() {
-	api_plugin_register_hook('bdcom', 'top_header_tabs',       'bdcom_show_tab',             'setup.php');
-	api_plugin_register_hook('bdcom', 'top_graph_header_tabs', 'bdcom_show_tab',             'setup.php');
-	api_plugin_register_hook('bdcom', 'config_arrays',         'bdcom_config_arrays',        'setup.php');
-	api_plugin_register_hook('bdcom', 'draw_navigation_text',  'bdcom_draw_navigation_text', 'setup.php');
-	api_plugin_register_hook('bdcom', 'config_form',           'bdcom_config_form',          'setup.php');
-	api_plugin_register_hook('bdcom', 'config_settings',       'bdcom_config_settings',      'setup.php');
-	api_plugin_register_hook('bdcom', 'poller_bottom',         'bdcom_poller_bottom',        'setup.php');
-	api_plugin_register_hook('bdcom', 'page_head',             'bdcom_page_head',            'setup.php');
+	$plugin = 'bdcom';
+	
+	api_plugin_register_hook($plugin, 'top_header_tabs',       'bdcom_show_tab',             'setup.php');
+	api_plugin_register_hook($plugin, 'top_graph_header_tabs', 'bdcom_show_tab',             'setup.php');
+	api_plugin_register_hook($plugin, 'config_arrays',         'bdcom_config_arrays',        'setup.php');
+	api_plugin_register_hook($plugin, 'draw_navigation_text',  'bdcom_draw_navigation_text', 'setup.php');
+	api_plugin_register_hook($plugin, 'config_form',           'bdcom_config_form',          'setup.php');
+	api_plugin_register_hook($plugin, 'config_settings',       'bdcom_config_settings',      'setup.php');
+	api_plugin_register_hook($plugin, 'poller_bottom',         'bdcom_poller_bottom',        'setup.php');
+	api_plugin_register_hook($plugin, 'page_head',             'bdcom_page_head',            'setup.php');
+	api_plugin_register_hook($plugin, 'clog_regex_array',	   'bdcom_clog_regex_array', 	 'setup.php');
 
 
 	# Register our realms
-	api_plugin_register_realm('bdcom', 'bdcom_view.php,bdcom_view_devices.php,bdcom_view_olts.php,bdcom_view_epons.php,bdcom_view_ports.php,bdcom_view_onus.php,bdcom_view_netadd.php,bdcom_view_info.php,bdcom_view_info.php,bdcom_ajax.php,graph_ion_view.php', 'bdcom Viewer', 1);
-	api_plugin_register_realm('bdcom', 'bdcom_devices.php,bdcom_logs.php,bdcom_device_types.php,bdcom_utilities.php', 'bdcom Administrator', 1);
+	api_plugin_register_realm($plugin, 'bdcom_view.php,bdcom_view_devices.php,bdcom_view_olts.php,bdcom_view_epons.php,bdcom_view_ports.php,bdcom_view_onus.php,bdcom_view_netadd.php,bdcom_view_info.php,bdcom_view_info.php,bdcom_ajax.php,graph_ion_view.php', 'bdcom Viewer', 1);
+	api_plugin_register_realm($plugin, 'bdcom_devices.php,bdcom_logs.php,bdcom_device_types.php,bdcom_utilities.php', 'bdcom Administrator', 1);
 
 	bdcom_setup_table ();
 }
@@ -402,7 +405,7 @@ $bdcom_poller_frequencies = array(
  			'friendly_name' => "Rows Per Page",
  			'description' => "The number of rows to display on a single page for bdcom devices and reports.",
  			'method' => 'textbox',
- 			'default' => "30",
+ 			'default' => "64",
  			"max_length" => "10"
  			);
 	bdcom_check_upgrade();
@@ -879,7 +882,7 @@ $bdcom_poller_frequencies = array(
  	}
  	
  if (!in_array("bdcom_num_rows", $result_new))
- 	$sql[] = array("bdcom_execute_sql","Insert into [settings] new parametr [bdcom_num_rows]","INSERT INTO settings VALUES ('bdcom_num_rows',50);");	
+ 	$sql[] = array("bdcom_execute_sql","Insert into [settings] new parametr [bdcom_num_rows]","INSERT INTO settings VALUES ('bdcom_num_rows',64);");	
  if (!in_array("bdcom_path_snmpset", $result_new))
  		$sql[] = array("bdcom_execute_sql","Insert into [settings] new parametr [bdcom_path_snmpset]","INSERT INTO settings VALUES ('bdcom_path_snmpset','C:\\usr\\bin\\snmpset.exe');");
  if (!in_array("bdcom_last_run_time", $result_new))		
@@ -1510,5 +1513,62 @@ if (!in_array("bdcom_enable_msg_fiber", $result_new))
  	return $return_rezult;
  }
  	
+function bdcom_clog_regex_array($regex_array) {
+	//2020/04/10 11:16:25 - bdcom BDCOM: Got syslog BDCOM message =[172.20.0.173,20200410111625, ONU 9845.62aa.83a4 is registered on EPON0/4:46. ] 
+	//$regex_array[] = array('name' => 'BDCOM', 'regex' => '( TH\[)([, \d]+)(\])', 'func' => 'thold_clog_regex_threshold');
+	$regex_array[] = array('name' => 'BDCOM_ONU', 'regex' => '( ONU )(\w{4}\.\w{4}\.\w{4})(\ )',   'func' => 'bdcom_regex_onu');
+	//BDCOM message =[172.20.0.178,20200410125725
+	$regex_array[] = array('name' => 'BDCOM_DEV', 'regex' => '(BDCOM\s+message\s+\=\[)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(\,)',   'func' => 'bdcom_regex_device');
+	return $regex_array;
+}
+
+
+
+function bdcom_regex_onu($matches) {
+	global $config;
+	
+	$result = $matches[0];
+	$MAC='';
+/* $matches
+: array = 
+  0: string = " ONU 8479.7374.de87"
+  1: string = " ONU "
+  2: string = "8479.7374.de87"
+  3: undefined = NULL
+ */
+
+	$mac=preg_replace('/(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})/i','$1:$2:$3:$4:$5:$6',str_replace('.','',$matches[2]));
+		if (!empty($mac)) {
+			$onus = db_fetch_assoc("SELECT onu_ipaddr,onu_macaddr, onu_descr FROM plugin_bdcom_onu where onu_macaddr='" . $mac . "'");
+			if (is_array($onus) and (cacti_sizeof($onus) == 1)) {
+				$result = $matches[1].'<a href=\'' . html_escape($config['url_path'] . 'graph_ion_view.php?action=preview&rfilter=' . (!empty($onus[0]['onu_ipaddr']) ? $onus[0]['onu_ipaddr']:$onus[0]['onu_macaddr'])) . '\'>' . (isset($onus[0]['onu_macaddr']) ? $onus[0]['onu_macaddr']:$matches[2]) . ' - ' . (!empty($onus[0]['onu_ipaddr']) ? $onus[0]['onu_ipaddr']:$onus[0]['onu_descr']) .  '</a>' . $matches[3];
+			}
+		}
+
+	return $result;
+}
  	
- 	?>
+function bdcom_regex_device($matches) {
+	global $config;
+	
+	$result = $matches[0];
+	$MAC='';
+/* $matches
+: array = 
+  0: string = " BDCOM message =[172.20.0.178,"
+  1: string = " BDCOM message =["
+  2: string = "172.20.0.178"
+  3: undefined = ","
+ */
+
+	if (!empty($matches[2])) {
+		$devs = db_fetch_assoc("SELECT * FROM plugin_bdcom_devices where hostname='" . $matches[2] . "'");
+		if (is_array($devs) and (cacti_sizeof($devs) == 1)) {
+			//https://sys.ion63.ru/plugins/bdcom/bdcom_view_epons.php?report=epons&device_id=+1&port_filter_type_id=&port_filter=&filter=
+			$result = $matches[1].'<a href=\'' . html_escape($config['url_path'] . 'plugins/bdcom/bdcom_view_epons.php?report=epons&device_id=+' . $devs[0]['device_id'] . '&port_filter_type_id=&port_filter=&filter=') . '\'>' . (isset($devs[0]['description']) ? $devs[0]['description']:$matches[2]) . '</a>' . $matches[3];
+		}
+	}
+
+	return $result;
+}
+?>

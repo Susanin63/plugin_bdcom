@@ -1,4 +1,4 @@
-<?php
+viber<?php
  /*
   +-------------------------------------------------------------------------+
   | Copyright (C) 2007 Susanin                                          |
@@ -36,6 +36,8 @@ global $bdcom_debug;
 $old_bdcom_debug = $bdcom_debug;
 $bdcom_debug = true;
 
+//print bdcom_convert_hex_to_view_string("83 80 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00");
+
 //bdcom_autoupdate();
 //print bdcom_convert_hex_to_view_string('FF:C0:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00');
 //bdcom_create_graphs();
@@ -45,7 +47,8 @@ if (isset($_SERVER["argv"][1])) {
 	$str_message = $_SERVER["argv"][1];
 	//exit;
 }else{
-	//$str_message = "172.20.0.171,20180605134749, ONU 8479.7399.af6e is deregistered on EPON0/1:3.";
+	
+	$str_message = "172.20.0.178,20200410155932, ONU 9845.62aa.826e is registered on EPON0/5:14.";
 	//$str_message = "172.20.0.171,20180605180510, ONU 8479.7399.af6e is registered on EPON0/2:3."
 	//$str_message = "172.20.0.171,20180627131018, ONU 9845.620b.efd7 is registered on EPON0/2:14.";
 	//$str_message = "172.20.0.181,20190507140052, ONU 8479.7374.d89a is registered on EPON0/1:1.. ";
@@ -123,7 +126,7 @@ if (preg_match("/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\,\s]+(\d{6,})[\,\s]*(ONU
 								$onu_row2 =  db_fetch_row ("SELECT * FROM plugin_bdcom_onu  WHERE onu_id='" . $onu_row["onu_id"] . "';");
 								if ($onu_row2["onu_online"] == "0") {  //if onu still down - send message
 									//cacti_log("BDCOM ERROR2 = " .  print_r($onu_row2, true), false, "bdcom_er");
-									send_viber_msg(date('[H:i] ') ."BDCOM FIBER1 DOWN: ONU_IP=[" . $onu_row["onu_ipaddr"] . " MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "]  https://sys.ion63.ru/graph_vg_view.php?uid=" . $onu_row["uid"]);
+									send_viber_msg(date('[H:i] ') ."BDCOM FIBER1 DOWN: ONU_IP=[" . $onu_row["onu_ipaddr"] . " MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "]  https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $onu_row["onu_ipaddr"]);
 								}else{
 									//send_viber_msg(date('[H:i] ') ."BDCOM SKIP FIBER1 DOWN: ONU_IP=[" . $onu_row["onu_ipaddr"] . " MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "]  https://sys.ion63.ru/graph_vg_view.php?uid=" . $onu_row["uid"], "+79377999153");
 								}
@@ -156,7 +159,7 @@ if (preg_match("/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\,\s]+(\d{6,})[\,\s]*(ONU
 							}
 							if ($onu_row["onu_online"] == "0" and $onu_row["onu_dereg_status"] == "8" and $onu_row["onu_dis_alarm"] == "0" and $onu_row["onu_wait_up"] <> "1" and (read_config_option("bdcom_enable_msg_fiber") == "1" and $onu_row["onu_soft_version"] == "10.0.26B.554")) {
 								//cacti_log("BDCOM ERROR31 = " .  print_r($onu_row, true), false, "bdcom_er");
-								send_viber_msg(date('[H:i] ') ."BDCOM FIBER1 UP: ONU_IP=[" . $onu_row["onu_ipaddr"] . "] \r\nMAC=[" . $matches["onu_mac"] . "]and \r\n  DEV=[" . $matches[1] . "]  https://sys.ion63.ru/graph_vg_view.php?uid=" . $onu_row["uid"]);
+								send_viber_msg(date('[H:i] ') ."BDCOM FIBER1 UP: ONU_IP=[" . $onu_row["onu_ipaddr"] . "] \r\nMAC=[" . $matches["onu_mac"] . "]and \r\n  DEV=[" . $matches[1] . "]  https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $onu_row["onu_ipaddr"]);
 							}							
 						}else{
 							bdcom_debug("BDCOM MOVE:  MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "], is found on other PON NUMBER=[" . $matches[8] . "], ONU_ID=[" . $onu_row["onu_id"] . "].");					
@@ -175,7 +178,8 @@ if (preg_match("/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\,\s]+(\d{6,})[\,\s]*(ONU
 						bdcom_debug("BDCOM ERROR:  MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "], is found on other device ID=[" . $onu_row["device_id"] . "], ONU_ID=[" . $onu_row["onu_id"] . "].");					
 					}else{
 						if ($matches[5] == "registered") {
-							bdcom_debug("BDCOM : NEW ONU MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "] and  NAME=[" . $matches["onu_name"] . "]. ");					
+							bdcom_debug("BDCOM : NEW ONU MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "] and  NAME=[" . $matches["onu_name"] . "]. ");	
+							send_viber_msg("BDCOM : NEW ONU MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "] and  NAME=[" . $matches["onu_name"] . "]. ", "+79377999153, +79377999152, +79631176333");							
 							//try to collect some info
 							update_onu_record($matches, $device, null);
 						}
@@ -295,7 +299,8 @@ function update_onu_record($syslog_row, $device, $cur_row = null){
 			}
 			//check vlan on EPON port
 			$eponVlanid = bdcom_snmp_get($device["hostname"], $device["snmp_get_community"],'.1.3.6.1.2.1.17.7.1.4.2.1.4.0.' . $onuIPvlanid , $device["snmp_get_version"],$device["snmp_get_username"],$device["snmp_get_password"],$device["snmp_get_auth_protocol"], $device["snmp_get_priv_passphrase"], $device["snmp_get_priv_protocol"],  $device["snmp_get_context"],$device["snmp_port"], $device["snmp_timeout"], $device["snmp_retries"], SNMP_WEBUI);
-			$ar_eponVlanId = bdcom_convert_hex_to_view_string($eponVlanid);
+			$ar_eponVlanId = bdcom_convert_hex_to_view_string2($eponVlanid);
+			bdcom_debug('eponVlanid=' . var_export($eponVlanid));
 			//$onu_row['onu_bindepon']
 
 			
@@ -306,6 +311,8 @@ function update_onu_record($syslog_row, $device, $cur_row = null){
 			//search ifindex epon in vlan array 
 			if (!in_array($onu_row['onu_bindepon'],$ar_eponVlanId['port_arr'])) {
 				$str_sms .= '\n ERROR: NO vlanid ' . $onuIPvlanid . ' ON EPON!';
+				bdcom_debug('onu_bindepon=' . var_export($onu_row['onu_bindepon']));
+				bdcom_debug('port_arr=' . var_export($ar_eponVlanId['port_arr']));
 			}
 			$str_sms .= ' !';
 			send_viber_msg($str_sms, "+79377999153, +79377999152, +79631176333");

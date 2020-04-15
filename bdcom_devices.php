@@ -376,7 +376,6 @@ switch (get_request_var('action')) {
  	input_validate_input_number(get_request_var("device_id"));
  	/* ==================================================== */
 
- 	display_output_messages();
  
  	if (!empty($_GET['device_id'])) {
  		$device = db_fetch_row("select * from plugin_bdcom_devices where device_id=" . $_GET['device_id']);
@@ -703,7 +702,7 @@ switch (get_request_var('action')) {
 	bdcom_device_request_validation();
 	
 	if (get_request_var('rows') == -1) {
-		$rows = read_config_option('num_rows_table');
+		$rows = read_config_option('bdcom_num_rows');
 	} elseif (get_request_var('rows') == -2) {
 		$rows = 999999;
 	} else {

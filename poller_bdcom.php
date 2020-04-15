@@ -53,12 +53,6 @@
  /* Disable Mib File Loading */
  putenv("MIBS=RFC-1215");
 
- 	if (read_config_option("bdcom_use_camm_syslog") == "on") {
-		bdcom_poller_process_camm_syslog(0);
-	}elseif(read_config_option("bdcom_use_snmptt_plugin") == "on"){
-		process_snmptt_traps(0);
-		//cimpb_poller_process_camm_traps($device_id_arr, $str_devices_id);
-	}
 			
  
  if (read_config_option("bdcom_collection_timing") != "disabled" ||  true) {
@@ -386,7 +380,7 @@
 	
 	
 		if ($only_device > 0) {
-				//db_store_imp_log("Завершен процесс опроса устройства [" . $only_device . "]", "device", $only_device, "poll",$only_device, !$exit_bdcom, !$exit_bdcom, !$exit_bdcom, !$exit_bdcom);
+				//db_store_bdcom_log("Завершен процесс опроса устройства [" . $only_device . "]", "device", $only_device, "poll",$only_device, !$exit_bdcom, !$exit_bdcom, !$exit_bdcom, !$exit_bdcom);
 			}
          
  	}else{

@@ -90,7 +90,7 @@ switch (get_request_var('action')) {
 	//header("Location: bdcom_view_onus.php");
  } 
  
-function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = TRUE) {
+function bdcom_view_get_onu_records(&$sql_where, $rows = '64', $apply_limits = TRUE) {
 
 	/* form the 'where' clause for our main sql query */
 	if (get_request_var('filter') != '') {
@@ -245,7 +245,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 					plugin_bdcom_devices.last_rundate,            
 					plugin_bdcom_onu.device_id, plugin_bdcom_onu.onu_id, plugin_bdcom_onu.onu_txpower, plugin_bdcom_onu.onu_rxpower, plugin_bdcom_onu.onu_distance, if (onu_done_view_count > 8 , '' , plugin_bdcom_onu.onu_done_reason) as onu_done_reason,
 					plugin_bdcom_onu.onu_macaddr, plugin_bdcom_onu.onu_ipaddr, plugin_bdcom_onu.onu_name, plugin_bdcom_onu.onu_descr, plugin_bdcom_onu.onu_operstatus, plugin_bdcom_onu.onu_adminstatus, plugin_bdcom_onu.onu_dereg_status, 
-					onu_done_view_count, onu_online, onu_first_scan_date, onu_lastchange_date, plugin_bdcom_onu.onu_scan_date,plugin_bdcom_onu.onu_rxpower_change, plugin_bdcom_onu.onu_rxpower_average, plugin_bdcom_onu.onu_version, plugin_bdcom_onu.onu_soft_version, onu_us_enduzelid, onu_us_enduzel_descr, onu_us_onuid,
+					onu_done_view_count, onu_online, onu_first_scan_date, onu_lastchange_date, plugin_bdcom_onu.onu_scan_date,plugin_bdcom_onu.onu_rxpower_change, plugin_bdcom_onu.onu_rxpower_average, plugin_bdcom_onu.onu_version, plugin_bdcom_onu.onu_soft_version, onu_us_enduzelid, onu_us_enduzel_descr, onu_us_onuid, onu_aclist,
 					lbv.f_flat, lbv.equipm_rtr,  if(gl_ip.id is null,if(gl_ping.id is null,'0',gl_ping.id),gl_ip.id) as ip_local_graph_id,             
 					lbv.login, plugin_bdcom_epons.epon_name, plugin_bdcom_epons.epon_index,
 					h.id
@@ -273,7 +273,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 		'rows' => array(
 			'filter' => FILTER_VALIDATE_INT,
 			'pageset' => true,
-			'default' => '-1'
+			'default' => '64'
 			),
 		'page' => array(
 			'filter' => FILTER_VALIDATE_INT,
@@ -287,7 +287,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 			),
 		'sort_column' => array(
 			'filter' => FILTER_CALLBACK,
-			'default' => 'order_id',
+			'default' => 'onu_uzel',
 			'options' => array('options' => 'sanitize_search_string')
 			),
 		'sort_direction' => array(
@@ -380,7 +380,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 	$only_1_epon = false;
 	
 	if (get_request_var('rows') == -1) {
-		$rows = read_config_option('num_rows_table');
+		$rows = read_config_option('bdcom_num_rows');
 	} elseif (get_request_var('rows') == -2) {
 		$rows = 999999;
 	} else {
@@ -487,7 +487,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 		}		
 		$display_text=$display_text+array(
 		"dist" => array(__('dist', 'bdcom'), "DESC"),
-		"  " => array(__(' ', 'bdcom'), "DESC"),
+		"" => array(__('', 'bdcom'), ""),
 		"power" => array(__('power', 'bdcom'), "DESC"),
 		"status" => array(__('ONU<br>status', 'bdcom'), "ASC"),
 		"onu_lastchange_date" => array(__('Дата<br>Изменения', 'bdcom'), "ASC"),
@@ -514,7 +514,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 	if (cacti_sizeof($onus)) {
 		$old_uzelid='';
 		foreach ($onus as $onu) {
-			form_alternate_row('line' . $onu['device_id'], true);
+			//form_alternate_row('line' . $onu['onu_id'], true);
 			if ($old_uzelid != $onu["onu_us_enduzelid"]) {
 				//print "";
 				print "<tr bgcolor='#DEB887'>
@@ -530,9 +530,12 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 				</tr>\n";	
 				$old_uzelid = $onu["onu_us_enduzelid"];
 			} 			
+			bdcom_form_alternate_row('line' . $onu['onu_id'], true, false, ($onu["onu_done_view_count"] > 8 ? ($onu["onu_operstatus"] == 1 ? "" : "background-color:#bfbfbf") :"background-color:#79ff4d"));
+			//($onu["onu_operstatus"] == 1 ? "" : "background-color:#bfbfbf")
 			bdcom_format_onu_row($onu, false, $only_1_dev, $only_1_epon);
 
 		}
+		db_execute("UPDATE `plugin_bdcom_onu` SET `onu_done_view_count`=`onu_done_view_count`+1 WHERE `onu_done_view_count`<9;");	
 	} else {
 		print '<tr><td colspan="' . $columns  . '"><em>' . __('No ONUs', 'bdcom') . '</em></td></tr>';
 	}
@@ -629,7 +632,19 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 		if ($onu["onu_operstatus"] == 2) {
 			$alt_distance ="[" . $alt_distance . "]";
 		}
-		
+		//$ip_str=(strlen(get_request_var('ip_filter')) ? preg_replace("/(" . preg_quote(get_request_var('ip_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $onu["onu_ipaddr"]) : $onu["onu_ipaddr"]);
+		if (isset($onu["onu_aclist"]) and substr($onu["onu_aclist"],0,3) == 'ac-'){
+			if (preg_match ('/\d{1,3}\.\d{1,3}\.(\d{1,3})\.(\d{1,3})/',$onu["onu_ipaddr"],$ip_octs)) {
+				if ($onu["onu_aclist"] == 'ac-' . $ip_octs[1] . '.' . $ip_octs[2]) {
+					$ip_str=preg_replace("/(" . $onu["onu_ipaddr"] . ")/i", "<span style='background-color: #00FF00;'>\\1</span>", $onu["onu_ipaddr"]);
+				}else{
+					$ip_str=preg_replace("/(" . $onu["onu_ipaddr"] . ")/i", "<span style='background-color: #FF6347;'>\\1</span>", $onu["onu_ipaddr"]);
+				}				
+			}
+		}else{
+			$ip_str=$onu["onu_ipaddr"];
+		}
+		$ip_str=(strlen(get_request_var('ip_filter')) ? preg_replace("/(" . preg_quote(get_request_var('ip_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $ip_str) : $ip_str);
 	
 		if (!$only_1_dev) {
 			form_selectable_cell("<a class='linkEditMain' href='bdcom_devices.php?action=edit&amp;device_id=" . $onu["device_id"] . "'>" . 
@@ -639,7 +654,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 		//IP
 		form_selectable_cell("<img src='" . $config['url_path'] . "plugins/bdcom/images/term.png' onClick='show_ping_w(" . '"' . $onu["onu_ipaddr"] . '"' . ")' onMouseOver='style.cursor=" . '"' . "pointer" . '"' . "' align='absmiddle' /img> " . 
 							 "<img src='" . $config['url_path'] . "plugins/bdcom/images/" . $onu["sig"] . ".png' TITLE='" . $onu["sig2"] . "' align='absmiddle'><a class='inkEditMain' TITLE='" . $onu["sig2"] . ' Адр:' . $onu["f_addr"] . "' href='bdcom_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=2&amp;ip_filter=" . $onu["onu_ipaddr"] . "&amp;mac_filter_type_id=1&amp;mac_filter=&amp;port_filter_type_id=&amp;port_filter=&amp;rows_selector=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=23&amp;y=10'>" . 
-			 (strlen(get_request_var('ip_filter')) ? preg_replace("/(" . preg_quote(get_request_var('ip_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $onu["onu_ipaddr"]) : $onu["onu_ipaddr"]) . "</a>" . 
+			 $ip_str . "</a>" . 
 			 ($onu["ip_local_graph_id"]==0 ? '' : " <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $onu['onu_ipaddr']  ) . "'><img src='" . $webroot . "images/view_graphs.gif' border='0' alt='' title='View Graph' align='absmiddle'></a>") . 
 			 (strlen($onu["equipm_rtr"])==0 ? '' : ' (R)') , $onu["onu_id"]);
 		//onu_done_reason
@@ -650,7 +665,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 		//onu_firmware
 		form_selectable_cell($onu_ver_row, $onu["onu_id"] ); 		
 		//name
-		form_selectable_cell((strlen(get_request_var('filter')) ? preg_replace("/(" . preg_quote(get_request_var('filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $onu["onu_name"]) : $onu["onu_name"]) . "</a>" . (false ? '' : " <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_ion_view.php?action=preview&host_id=" . $onu['id'] . "&snmp_index=&rfilter=" . $onu["onu_name"] ) . "'><img src='" . $webroot . "images/view_graphs.gif' border='0' alt='' title='View Graph' align='absmiddle'></a>") , $onu["onu_id"]);
+		form_selectable_cell((strlen(get_request_var('filter')) ? preg_replace("/(" . preg_quote(get_request_var('filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $onu["onu_name"]) : $onu["onu_name"]) . "</a>" . (false ? '' : " <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_ion_view.php?action=preview&host_id=" . $onu['id'] . "&snmp_index=&rfilter=" . $onu["onu_name"] ) . "$'><img src='" . $webroot . "images/view_graphs.gif' border='0' alt='' title='View Graph' align='absmiddle'></a>") , $onu["onu_id"]);
 		//us uzel
 		form_selectable_cell("<a class='linkEditMain' TITLE='" . $onu["onu_us_enduzel_descr"] . "' href='https://us.ion63.ru/oper/uzel.php?type=vols&code=" . $onu["onu_us_enduzelid"] . "'>" . 
  				$onu["onu_us_enduzelid"] . "</a>", $onu["onu_id"]);		
@@ -666,6 +681,11 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
 		//distance
 		form_selectable_cell($alt_distance, $onu["onu_id"] );			
 		//power
+		if ($onu["onu_rxpower_change"] >= 15){
+			print "\t<td><span style='background-color: #ff00ff;'>" . round($onu["onu_rxpower_average"]*0.1,1) . "</span></td>\n";
+		}else{
+			print "\t<td></td>\n";
+		}		
 		form_selectable_cell(bdcom_color_power_cell($onu), $onu["onu_id"] );			
 		//status
 		form_selectable_cell(bdcom_convert_status_dereg_2str($onu["onu_operstatus"], $onu["onu_dereg_status"])  . " [" . bdcom_convert_status_2str($onu["onu_adminstatus"]) . "]", $onu["onu_id"] );
@@ -835,7 +855,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
  			foreach ($row_array as $row_id) {
  	            $row_info = db_fetch_row("SELECT d.description, onu_name, onu_ipaddr, onu_macaddr FROM plugin_bdcom_onu  o LEFT JOIN plugin_bdcom_devices d on (d.device_id=o.device_id) where onu_id=" . $row_id);
  				$row_list .= "<li>" . $row_info["description"] . "      IP:" . $row_info["onu_ipaddr"] . "    MAC:" . $row_info["onu_macaddr"] . "      ID:" . $row_info["onu_name"] . "<br>";
- 				$row_ids = $row_ids . "'" . $matches[1] . "', ";	
+ 				$row_ids = $row_ids . "'" . $row_id . "', ";	
  			}
  		}
  	}

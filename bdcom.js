@@ -72,24 +72,9 @@ function scan_onu(onu_id) {
     $.get(url, function(data){
         var json = jQuery.parseJSON(data);
         $(function () {
-            var content = '';
-            //content += '<tbody>'; -- **superfluous**
-            for (var i = 0; i < json.length; i++) {
-            content += '<tr id="' + json[i].ID + '">';
-            content += '<td><input id="check_' + json[i].ID + '" name="check_' + json[i].ID + '" type="checkbox" value="' + json[i].ID + '" autocomplete=OFF /></td>';
-            content += '<td>' + json[i].ID + '</td>';
-            content += '<td>' + json[i].Name + '</td>';
-            content += '<td>' + json[i].CountryCode + '</td>';
-            content += '<td>' + json[i].District + '</td>';
-            content += '<td>' + json[i].Population + '</td>';
-            content += '<td><a href="#" class="edit">Edit</a> <a href="#" class="delete">Delete</a></td>';
-            content += '</tr>';
-            }
-           // content += '</tbody>';-- **superfluous**
-            //$('table tbody').replaceWith(content);  **incorrect..**
-
 			//$('#r77').innerHTML=json['rx']; 
 			$('#pw'+onu_id).html(json['pow'])
+			$('#pw'+onu_id+'_').html(json['pow'])
 			$('#r_'+onu_id).attr('src', 'images/reload_icon_small.gif'); 
        });  
     });	

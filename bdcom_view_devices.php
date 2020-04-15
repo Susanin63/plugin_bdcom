@@ -196,7 +196,7 @@ function bdcom_view_get_device_records(&$sql_where, $rows = '30', $apply_limits 
 	bdcom_device_request_validation();
 
 	if (get_request_var('rows') == -1) {
-		$rows = read_config_option('num_rows_table');
+		$rows = read_config_option('bdcom_num_rows');
 	} elseif (get_request_var('rows') == -2) {
 		$rows = 999999;
 	} else {

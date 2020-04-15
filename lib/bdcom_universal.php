@@ -153,6 +153,7 @@
 		$onuTemper = bdcom_xform_standard_indexed_data('.1.3.6.1.4.1.3320.101.10.5.1.2', $device);
 		$onuRxPower = bdcom_xform_standard_indexed_data('.1.3.6.1.4.1.3320.101.10.5.1.5', $device);  //nit is 0.1dB.
 		$onuTxPower = bdcom_xform_standard_indexed_data('.1.3.6.1.4.1.3320.101.10.5.1.6', $device);  //nit is 0.1dB.
+		$onuifInIpACL = xform_standard_indexed_data_oid('.1.3.6.1.4.1.3320.101.105.1.1.5', $device); 
 		$onuDeregDescr = 	bdcom_array_strip_dereg_descr(xform_standard_indexed_data_oid('.1.3.6.1.4.1.3320.101.11.1.1.11', $device)); //ONU binding last deregister reason. normal(2), mpcp-down(3), oam-down(4), firmware-download(5), illegal-mac(6) ,llid-admin-down(7) , wire-down(8) , power-off(9) ,unknow(255) 
 	}
 
@@ -178,6 +179,7 @@
 		$ifOnus[$key]["temper"]   = (isset($onuTemper[$ifOnu["ifIndex"]]) ? $onuTemper[$ifOnu["ifIndex"]]/256 : 0);
 		$ifOnus[$key]["rx_power"] = (isset($onuRxPower[$ifOnu["ifIndex"]]) ? $onuRxPower[$ifOnu["ifIndex"]] : 0);		
 		$ifOnus[$key]["tx_power"] = (isset($onuTxPower[$ifOnu["ifIndex"]]) ? $onuTxPower[$ifOnu["ifIndex"]] : 0);
+		$ifOnus[$key]["onu_aclist"] = (isset($onuifInIpACL[$ifOnu["ifIndex"] . '.1']) ? $onuifInIpACL[$ifOnu["ifIndex"] . '.1'] : '');
 		$ifOnus[$key]["onuDeregDescr"] = (isset($onuDeregDescr[$ifOnus[$key]["bindepon"] . "." . bdcom_mac_16_to_10($ifOnus[$key]["mac"])]) ? $onuDeregDescr[$ifOnus[$key]["bindepon"] . "." . bdcom_mac_16_to_10($ifOnus[$key]["mac"])] : "255");
 	}
 	

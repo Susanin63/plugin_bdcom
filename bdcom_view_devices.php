@@ -349,7 +349,7 @@ function bdcom_view_get_device_records(&$sql_where, $rows = '30', $apply_limits 
 		form_selectable_cell(filter_value($device['hostname'], get_request_var('filter')), $device['device_id']);
 		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_epons.php?report=epons&device_id=+" . $device['device_id'] . "&port_filter_type_id=&port_filter=&filter='>" . $device['epon_total'] . "</a>", $device['device_id']);
 		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_ports.php?report=ports&device_type_id=-1&device_id=+" . $device['device_id'] . "&status=-1&filter='>" . $device['ports_total'] . "</a>", $device['device_id']);
-		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_onus.php?report=onus&device_type_id=-1&device_id=+" . $device['device_id'] . "&epon_id=-1&ip_filter_type_id=1&ip_filter=&mac_filter_type_id=1&mac_filter=&filter='>" . $device['onu_total'] . "</a>", $device['device_id']);							
+		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_onus.php?report=onus&device_type_id=-1&device_id=+" . $device['device_id'] . "&epon_id=-1&ip_filter_type_id=1&ip_filter=&uzel_id=-1&mac_filter_type_id=1&mac_filter=&filter='>" . $device['onu_total'] . "</a>", $device['device_id']);							
 		form_selectable_cell(bdcom_format_datetime($device['last_rundate']), $device['device_id'] );
 		form_selectable_cell(number_format($device['last_runduration']), $device['device_id'] );				
 		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_devices.php?action=actions&drp_action=5&id=1&selected_items=" . serialize(array(1=>$device["device_id"])) . "'><img src='../../images/reload_icon_small.gif' alt='Reload Data Query' border='0' align='absmiddle'></a>", $device['device_id']);

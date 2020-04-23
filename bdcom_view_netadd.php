@@ -84,7 +84,7 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " INET_NTOA(n.net_ipaddr) != ''";
 	}
 	
-	$sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " n.`net_type`=3 ";
+	$sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " (n.`net_archive`=0 or ( n.`net_archive`=1 and n.`net_view_count` < 10) or ( n.`net_archive`=1 and datediff(now(),net_change_time)=0)) ";
 	
  	$sortby = get_request_var('sort_column');
  	if ($sortby=="net_ipaddr") {
@@ -99,10 +99,11 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 		$sql_limit = '';
 	}
 	
- 		$query_string = "SELECT  n.* , INET_NTOA(n.net_ipaddr) as ipa , 
+ 		$query_string = "SELECT  n.* , v.ag_num, date(v.agr_date) as agr_date, INET_NTOA(n.net_ipaddr) as ipa , 
 		 IF(`net_ttl`='0', 'Постоянно',DATE_ADD(n.net_change_time, INTERVAL  `net_ttl` HOUR)) as net_ttl_date,user_auth.username as net_change_user_name, '<== Any Device ==>' as description 
-		 from imb_auto_updated_nets n
+		 from plugin_bdcom_podkl n
 		 left join user_auth on (n.net_change_user=user_auth.id)
+		 left join (SELECT ag_num, agr_date, vg_id FROM lb_vgroups_s where id=1) v on (n.vg_id=v.vg_id)
         $sql_where
         $sql_order
 		$sql_limit";
@@ -132,7 +133,7 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 			),
 		'sort_column' => array(
 			'filter' => FILTER_CALLBACK,
-			'default' => 'net_id',
+			'default' => 'vg_id',
 			'options' => array('options' => 'sanitize_search_string')
 			),
 		'sort_direction' => array(
@@ -192,15 +193,19 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 
     $nets = bdcom_view_get_netadd_records($sql_where, $rows);    
 
-    $total_rows = db_fetch_cell("SELECT COUNT(*) FROM imb_auto_updated_nets n 			 
+    $total_rows = db_fetch_cell("SELECT COUNT(*) FROM plugin_bdcom_podkl n 			 
             $sql_where");
  	
 
   	$display_text = array(
 	
- 		'ipa' => array(__('IP', 'bdcom'), 'ASC'),
+ 		'agr_date' => array(__('Дата', 'bdcom'), 'ASC'),
+		'ag_num' => array(__('Договор', 'bdcom'), 'ASC'),
+		'ipa' => array(__('IP', 'bdcom'), 'ASC'),
  		'net_ttl_date' => array(__('TTL', 'bdcom'), 'ASC'),
- 		'net_description' => array(__('Description', 'bdcom'), 'ASC'),
+		'net_uzelid' => array(__('Узел', 'bdcom'), 'ASC'),
+		'net_uzelid2' => array(__('Бокс', 'bdcom'), 'ASC'),
+ 		'net_adress' => array(__('Adress', 'bdcom'), 'ASC'),
  		'net_change_user_name' => array(__('Author', 'bdcom'), 'ASC'));		
 		
 	$columns = sizeof($display_text) +1 ;  
@@ -218,16 +223,18 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 
 	if (cacti_sizeof($nets)) {
 		foreach ($nets as $net) {
-			form_alternate_row('line' . $net['net_id'], true);
+			//form_alternate_row('line' . $net['net_id'], true);
+			bdcom_form_alternate_row('line' . $net['net_id'], true, false, ($net["net_archive"] == 0 ? "" : "background-color:#bdbdbb"));
 			bdcom_format_netadd_row($net);
 
 		}
 		
 		
+		db_execute("UPDATE `plugin_bdcom_podkl` SET `net_view_count`=`net_view_count`+1 WHERE `net_archive`=1 and `net_view_count`<10;");	
 	} else {
 		print '<tr><td colspan="' . $columns  . '"><em>' . __('No AutoCreate Record', 'bdcom') . '</em></td></tr>';
 	}
-
+	
 	html_end_box(false);
 
 	if (cacti_sizeof($nets)) {
@@ -246,16 +253,29 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 
  function bdcom_format_netadd_row($net, $actions=false) {
 	global $config;
-
+		$row_bgcolor = ($net["net_archive"] == 0 ? ($net["net_gepon"] == 1 ? ($net["net_type"] == 2 ? "#76e7a5" : "#76d2e7") :"#e7e576") : "#bdbdbb");
+		$ion_us_url = read_config_option("ion_us_adress");
 	
 		//$bgc = db_fetch_cell("SELECT hex FROM colors WHERE id='" . $net['color_row'] . "'");
-		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=2&amp;ip_filter=" . $net['ipa'] . "&amp;mac_filter_type_id=2&amp;mac_filter=&amp;port_filter_type_id=&amp;port_filter=&amp;rows_selector=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=14&amp;y=6'>" . 
+		form_selectable_cell($net['agr_date'], $net['net_id'],'',"background-color: " . $row_bgcolor . ";");
+		form_selectable_cell($net['ag_num'], $net['net_id'],'',"background-color: " . $row_bgcolor . ";");
+		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=2&amp;ip_filter=" . $net['ipa'] . "&amp;mac_filter_type_id=-1&amp;mac_filter=&amp;port_filter_type_id=&amp;port_filter=&amp;rows_selector=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=14&amp;y=6'>" . 
 			(strlen(get_request_var('ip_filter')) ? strtoupper(preg_replace("/(" . preg_quote(get_request_var('ip_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $net['ipa'])) : $net['ipa']) . "</font></a>", $net['net_id']);		
 		
 		form_selectable_cell($net['net_ttl_date'], $net['net_id']);
-		form_selectable_cell(filter_value($net['net_description'], get_request_var('filter')), $net['net_id']);
+		
+		form_selectable_cell($net['net_uzelid'] <> '0' ? "<a href='" . $ion_us_url . "/oper/index.php?core_section=node&action=show&id=" . $net['net_uzelid'] . "' target='_blank'>Дом</a>, <a href='" . $ion_us_url . "/oper/index.php?core_section=map&action=show&&opt_wnode_4=1=1&opt_wc=1&by_node=" . $net['net_uzelid'] . "&is_show_center_marker=1' target='_blank'>карта</a>" : $net['net_uzelid'] , $net['net_id']);
+		form_selectable_cell($net['net_uzelid2'] <> '0' ? "<a href='" . $ion_us_url . "/oper/index.php?core_section=node&action=show&id=" . $net['net_uzelid2'] . "' target='_blank'>Бокс [" .  $net['net_uzelid2'] . "]</a>" : $net['net_uzelid2'], $net['net_id']);
+		
+		
+
+		form_selectable_cell(filter_value($net['net_adress'], get_request_var('filter')), $net['net_id']);
 		form_selectable_cell(filter_value($net['net_change_user_name'], get_request_var('filter')), $net['net_id']);
-		form_checkbox_cell($net['net_description'], $net['net_id']);	
+		if ($net["net_archive"] == 0) {
+			form_checkbox_cell($net['net_adress'], $net['net_id']);
+		} else {
+			print "<td></td>";
+		}		
 		form_end_row();
 
 }

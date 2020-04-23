@@ -538,7 +538,7 @@ function bdcom_view_get_info_macips_records(&$sql_where, $apply_limits = TRUE, $
 
  
  function bdcom_view_info() {
-     global $title, $report, $colors, $rows_selector, $config, $onu_actions;
+    global $title, $report, $colors, $rows_selector, $config, $onu_actions;
  
  	print "<div id='element_to_pop_ping'>
 			<a class='b-close'>x<a/>
@@ -588,6 +588,7 @@ function bdcom_view_get_info_macips_records(&$sql_where, $apply_limits = TRUE, $
 			if (sizeof($ip_full_info) == 1) {
 				$o = reset($onus);
 				$i = reset($ip_full_info);
+				$ion_us_url = read_config_option("ion_us_adress");
 				$rescan_pwr = "<img id='r_" . $o["onu_id"] . "' src='" . $config['url_path'] . "plugins/bdcom/images/rescan.gif' alt='' onMouseOver='style.cursor=\"pointer\"' onClick='scan_onu(" . $o["onu_id"] . ")' title='" . __esc('Rescan ONU', 'bdcom') . "'>";
 				html_start_box('Информация по IP', '98%', '', '1', 'center', '');
 				?>
@@ -603,7 +604,7 @@ function bdcom_view_get_info_macips_records(&$sql_where, $apply_limits = TRUE, $
 							<tr><td><?php print ("FIRM = " . $o["onu_soft_version"] . " <a class='linkEditMain' href='bdcom_view.php?action=onu_query_firm&onu_id=" . $o["onu_id"] . "'><img src='../../images/reload_icon_small.gif' alt='Update ONU' border='0' align='absmiddle'></a>");?></td></tr>
 							<tr><td><?php print ("DIST = " . $o["onu_distance"] . "\n");?></td></tr>
 							<tr><td><?php print '<div class="fit_div"> PWR= </div><div class="fit_div" id=pw' . $o["onu_id"] . '_>' .  bdcom_color_power($o) . '</div>' . '  ' . $rescan_pwr ;?></td></tr>
-							<tr><td><?php print ("UZEL = " . $o["onu_us_enduzelid"] . "  <a class='linkEditMain'  href='https://us.ion63.ru/oper/uzel.php?type=vols&code=" . $o["onu_us_enduzelid"] . "'> [" . $o["onu_us_enduzel_descr"] . "] " . "</a>");?></td></tr>
+							<tr><td><?php print ("UZEL = " . $o["onu_us_enduzelid"] . "  <a class='linkEditMain'  href='" . $ion_us_url . "/oper/uzel.php?type=vols&code=" . $o["onu_us_enduzelid"] . "'> [" . $o["onu_us_enduzel_descr"] . "] " . "</a>");?></td></tr>
 							<tr><td><?php print ("Change = " . $o["onu_lastchange_date"] . "\n");?></td></tr>
 							
 						</table>
@@ -675,7 +676,7 @@ function bdcom_view_get_info_macips_records(&$sql_where, $apply_limits = TRUE, $
 	
 	if (cacti_sizeof($onus)) {
 		foreach ($onus as $onu) {
-			form_alternate_row('line' . $onu['device_id'], true);
+			bdcom_form_alternate_row('line' . $onu['onu_id'], true, false, ($onu["onu_done_view_count"] > 8 ? ($onu["onu_operstatus"] == 1 ? "" : "background-color:#bfbfbf") :"background-color:#79ff4d"));
 			bdcom_format_onu_row($onu);
 
 		}
@@ -697,105 +698,107 @@ function bdcom_view_get_info_macips_records(&$sql_where, $apply_limits = TRUE, $
 
 /* IMPB */
 
-	$webroot = $config['url_path'] . 'plugins/impb/';
-    $sql_where = "";
-    $bindings = bdcom_view_get_bindings_records($sql_where, true, $rows);
-    $total_rows = db_fetch_cell("SELECT
-             COUNT(imb_macip.device_id)
-             FROM imb_macip
-			 LEFT JOIN (SELECT l.segment,  v.*  FROM lb_staff l left JOIN lb_vgroups_s v ON l.vg_id = v.vg_id WHERE v.`archive`=0) lbs ON INET_ATON(imb_macip.macip_ipaddr) = lbs.segment 
-             $sql_where");	
+	if (api_plugin_is_enabled('impb')){ 
 	
-	$nav = html_nav_bar('bdcom_view_info.php?report=info', MAX_DISPLAY_PAGES, get_request_var('page'), $rows, $total_rows, 14, __('Bindings'), 'page', 'main');
+		$webroot = $config['url_path'] . 'plugins/impb/';
+		$sql_where = "";
+		$bindings = bdcom_view_get_bindings_records($sql_where, true, $rows);
+		$total_rows = db_fetch_cell("SELECT
+				 COUNT(imb_macip.device_id)
+				 FROM imb_macip
+				 LEFT JOIN (SELECT l.segment,  v.*  FROM lb_staff l left JOIN lb_vgroups_s v ON l.vg_id = v.vg_id WHERE v.`archive`=0) lbs ON INET_ATON(imb_macip.macip_ipaddr) = lbs.segment 
+				 $sql_where");	
+		
+		$nav = html_nav_bar('bdcom_view_info.php?report=info', MAX_DISPLAY_PAGES, get_request_var('page'), $rows, $total_rows, 14, __('Bindings'), 'page', 'main');
 
-	form_start('bdcom_view_infob.php', 'chk');
+		form_start('bdcom_view_infob.php', 'chk');
 
-	html_start_box('', '100%', '', '3', 'center', '');
+		html_start_box('', '100%', '', '3', 'center', '');
 
- 
-	$display_text = array(
-		'description'      => array(__('Device'), 'ASC'),
-		'hostname'        => array(__('IP(имя)'), 'ASC'),
-		'macip_ipaddr'      => array(__('IP Address'), 'ASC'),
-		'macip_macaddr'      => array(__('MAC Address'), 'ASC'),
-		'f_flat'      => array(__('Komn'), 'ASC'),
-		'macip_port_view'        => array(__('Port<br>List'), 'ASC'),
-		'macip_imb_status'      => array(__('Record<br>status'), 'ASC'),
-		'macip_imb_action'     => array(__('Record<br>action'), 'ASC'),
-		'macip_mode'     => array(__('Mode'), 'ASC'),
-		'macip_may_move'     => array(__('Free'), 'DESC'),
-		'macip_lastchange_date'     => array(__('Дата<br>Изменения'), 'ASC'),
-		'macip_scan_date'      => array(__('Scan Date'), 'DESC'));
- 
-	html_header_sort_checkbox($display_text, get_request_var('sort_column'), get_request_var('sort_direction'), false);
+	 
+		$display_text = array(
+			'description'      => array(__('Device'), 'ASC'),
+			'hostname'        => array(__('IP(имя)'), 'ASC'),
+			'macip_ipaddr'      => array(__('IP Address'), 'ASC'),
+			'macip_macaddr'      => array(__('MAC Address'), 'ASC'),
+			'f_flat'      => array(__('Komn'), 'ASC'),
+			'macip_port_view'        => array(__('Port<br>List'), 'ASC'),
+			'macip_imb_status'      => array(__('Record<br>status'), 'ASC'),
+			'macip_imb_action'     => array(__('Record<br>action'), 'ASC'),
+			'macip_mode'     => array(__('Mode'), 'ASC'),
+			'macip_may_move'     => array(__('Free'), 'DESC'),
+			'macip_lastchange_date'     => array(__('Дата<br>Изменения'), 'ASC'),
+			'macip_scan_date'      => array(__('Scan Date'), 'DESC'));
+	 
+		html_header_sort_checkbox($display_text, get_request_var('sort_column'), get_request_var('sort_direction'), false);
 
-    $i = 0;
- 	$mac_font_size=read_config_option("dimpb_mac_addr_font_size");
-     if (sizeof($bindings) > 0) {
-         foreach ($bindings as $binding) {
-			$scan_date = $binding["macip_scan_date"];
+		$i = 0;
+		$mac_font_size=read_config_option("dimpb_mac_addr_font_size");
+		 if (sizeof($bindings) > 0) {
+			 foreach ($bindings as $binding) {
+				$scan_date = $binding["macip_scan_date"];
 
-			if ($binding["macip_active_last_poll"] == 1)  {
-				$color_line_date="<span style='font-weight: bold;'>";
-			}else{
-				$color_line_date="";
-			}			
- 			
-			form_alternate_row('line' . $binding["macip_id"], true);
-			form_selectable_cell("<a class='linkEditMain' href='" . htmlspecialchars($webroot . 'impb_devices.php?action=edit&device_id=' . $binding["device_id"]) . "'>'" . 
- 				(strlen(get_request_var('filter')) ? preg_replace("/(" . preg_quote(get_request_var('filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["description"]) : $binding["description"]) . "</strong></a>", $binding["macip_id"]);			
+				if ($binding["macip_active_last_poll"] == 1)  {
+					$color_line_date="<span style='font-weight: bold;'>";
+				}else{
+					$color_line_date="";
+				}			
 				
- 			form_selectable_cell($binding["hostname"], $binding["macip_id"] );
- 			
-			
-			//ip
-			form_selectable_cell("<img src='" . $config['url_path'] . "plugins/impb/images/term.png' onClick='show_ping_w(" . '"' . $binding["macip_ipaddr"] . '"' . ")' onMouseOver='style.cursor=" . '"' . "pointer" . '"' . "' align='absmiddle' /img> " .
-								 "<img src='" . $config['url_path'] . "plugins/impb/images/" . $binding["sig"] . ".png' TITLE='" . $binding["sig2"] . "' align='absmiddle'><a class='inkEditMain' TITLE='" . $binding["sig2"] . ' Адр:' . $binding["f_addr"] . "' href='impb_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=2&amp;ip_filter=" . $binding["macip_ipaddr"] . "&amp;mac_filter_type_id=1&amp;mac_filter=&amp;port_filter_type_id=&amp;port_filter=&amp;rows=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=23&amp;y=10'>" . 
- 				 (strlen(get_request_var('ip_filter')) ? preg_replace("/(" . preg_quote(get_request_var('ip_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["macip_ipaddr"]) : $binding["macip_ipaddr"]) . "</a>" . ($binding["ip_local_graph_id"]==0 ? '' : " <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_view.php?action=preview&host_id=62&graph_template_id=0&snmp_index=&rfilter=" . $binding['macip_ipaddr'] ) . "'><img src='" . $webroot . "images/view_graphs.gif' alt='' title='View Graph' align='absmiddle'></a>") . (strlen($binding["equipm_rtr"])==0 ? '' : ' (R)') , $binding["macip_id"]);
- 			
-				 
-			
- 			form_selectable_cell("<a class='linkEditMain' href='impb_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=8&amp;ip_filter=&amp;mac_filter_type_id=2&amp;mac_filter=" . $binding["macip_macaddr"] . "&amp;port_filter_type_id=&amp;port_filter=&amp;rows=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=14&amp;y=6'><font size='" . $mac_font_size . "' face='Courier'>" . 
- 				(strlen(get_request_var('mac_filter')) ? strtoupper(preg_replace("/(" . preg_quote(get_request_var('mac_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["macip_macaddr"])) : $binding["macip_macaddr"]) . "</font></a>", $binding["macip_id"]);
- 				
-			form_selectable_cell((strlen(get_request_var('m_filter')) ? preg_replace("/(" . preg_quote(get_request_var('m_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["f_flat"]) : $binding["f_flat"]), $binding["macip_id"] );
-			
-			form_selectable_cell((strlen(get_request_var('m_filter')) ? preg_replace("/(" . preg_quote(get_request_var('m_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["macip_port_view"]) : " <a class='linkEditMain' href=impb_view_ports.php?report=ports&device_id=" . $binding['device_id'] . "&port_number=" . $binding["macip_port_view"]) . ">" . $binding["macip_port_view"] . 
-				" <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_view.php?action=preview&host_id=" . $binding['cid'] . "&snmp_index=" . $binding["macip_port_view"] . "&graph_template_id=0&rfilter=") . "'><img src='" . $webroot . "images/view_graphs.gif' alt='' title='View Graph' align='absmiddle'></a>", $binding["macip_id"] );
-			
- 			form_selectable_cell(bdcom_convert_macip_state_2str($binding["macip_imb_status"]), $binding["macip_id"] );
- 			form_selectable_cell(bdcom_convert_macip_action_2str($binding["macip_imb_action"], $binding["type_imb_action"]), $binding["macip_id"]  );
- 			form_selectable_cell(bdcom_convert_macip_mode_2str_full($binding["macip_mode"], $binding["device_id"]), $binding["macip_id"]  );
- 			
-			form_selectable_cell(bdcom_convert_free_2str($binding["macip_may_move"]), $binding["macip_id"] );
-						
-			form_selectable_cell($binding["macip_lastchange_date"], $binding["macip_id"] );
- 			
- 			form_selectable_cell((strlen(get_request_var('m_filter')) ? $color_line_date . " " .preg_replace("/(" . preg_quote(get_request_var('m_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>" , $binding["macip_scan_date"]) : $color_line_date . " " . $binding["macip_scan_date"]), $binding["macip_id"] );
- 			
- 			
-			if ($binding["macip_online"] == 1) {
- 				form_checkbox_cell($binding["macip_ipaddr"], $binding["macip_id"]);
- 			} else {
- 				print "<td></td>";
- 			}
- 			form_end_row();			
-         }
- 
-         /* put the nav bar on the bottom as well */
-         print $nav;
-     }else{
-         print "<tr><td><em>No IMP Bindings found</em></td></tr>";
-     }
+				form_alternate_row('line' . $binding["macip_id"], true);
+				form_selectable_cell("<a class='linkEditMain' href='" . htmlspecialchars($webroot . 'impb_devices.php?action=edit&device_id=' . $binding["device_id"]) . "'>'" . 
+					(strlen(get_request_var('filter')) ? preg_replace("/(" . preg_quote(get_request_var('filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["description"]) : $binding["description"]) . "</strong></a>", $binding["macip_id"]);			
+					
+				form_selectable_cell($binding["hostname"], $binding["macip_id"] );
+				
+				
+				//ip
+				form_selectable_cell("<img src='" . $config['url_path'] . "plugins/impb/images/term.png' onClick='show_ping_w(" . '"' . $binding["macip_ipaddr"] . '"' . ")' onMouseOver='style.cursor=" . '"' . "pointer" . '"' . "' align='absmiddle' /img> " .
+									 "<img src='" . $config['url_path'] . "plugins/impb/images/" . $binding["sig"] . ".png' TITLE='" . $binding["sig2"] . "' align='absmiddle'><a class='inkEditMain' TITLE='" . $binding["sig2"] . ' Адр:' . $binding["f_addr"] . "' href='impb_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=2&amp;ip_filter=" . $binding["macip_ipaddr"] . "&amp;mac_filter_type_id=1&amp;mac_filter=&amp;port_filter_type_id=&amp;port_filter=&amp;rows=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=23&amp;y=10'>" . 
+					 (strlen(get_request_var('ip_filter')) ? preg_replace("/(" . preg_quote(get_request_var('ip_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["macip_ipaddr"]) : $binding["macip_ipaddr"]) . "</a>" . ($binding["ip_local_graph_id"]==0 ? '' : " <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_view.php?action=preview&host_id=62&graph_template_id=0&snmp_index=&rfilter=" . $binding['macip_ipaddr'] ) . "'><img src='" . $webroot . "images/view_graphs.gif' alt='' title='View Graph' align='absmiddle'></a>") . (strlen($binding["equipm_rtr"])==0 ? '' : ' (R)') , $binding["macip_id"]);
+				
+					 
+				
+				form_selectable_cell("<a class='linkEditMain' href='impb_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=8&amp;ip_filter=&amp;mac_filter_type_id=2&amp;mac_filter=" . $binding["macip_macaddr"] . "&amp;port_filter_type_id=&amp;port_filter=&amp;rows=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=14&amp;y=6'><font size='" . $mac_font_size . "' face='Courier'>" . 
+					(strlen(get_request_var('mac_filter')) ? strtoupper(preg_replace("/(" . preg_quote(get_request_var('mac_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["macip_macaddr"])) : $binding["macip_macaddr"]) . "</font></a>", $binding["macip_id"]);
+					
+				form_selectable_cell((strlen(get_request_var('m_filter')) ? preg_replace("/(" . preg_quote(get_request_var('m_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["f_flat"]) : $binding["f_flat"]), $binding["macip_id"] );
+				
+				form_selectable_cell((strlen(get_request_var('m_filter')) ? preg_replace("/(" . preg_quote(get_request_var('m_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $binding["macip_port_view"]) : " <a class='linkEditMain' href=impb_view_ports.php?report=ports&device_id=" . $binding['device_id'] . "&port_number=" . $binding["macip_port_view"]) . ">" . $binding["macip_port_view"] . 
+					" <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_view.php?action=preview&host_id=" . $binding['cid'] . "&snmp_index=" . $binding["macip_port_view"] . "&graph_template_id=0&rfilter=") . "'><img src='" . $webroot . "images/view_graphs.gif' alt='' title='View Graph' align='absmiddle'></a>", $binding["macip_id"] );
+				
+				form_selectable_cell(bdcom_convert_macip_state_2str($binding["macip_imb_status"]), $binding["macip_id"] );
+				form_selectable_cell(bdcom_convert_macip_action_2str($binding["macip_imb_action"], $binding["type_imb_action"]), $binding["macip_id"]  );
+				form_selectable_cell(bdcom_convert_macip_mode_2str_full($binding["macip_mode"], $binding["device_id"]), $binding["macip_id"]  );
+				
+				form_selectable_cell(bdcom_convert_free_2str($binding["macip_may_move"]), $binding["macip_id"] );
+							
+				form_selectable_cell($binding["macip_lastchange_date"], $binding["macip_id"] );
+				
+				form_selectable_cell((strlen(get_request_var('m_filter')) ? $color_line_date . " " .preg_replace("/(" . preg_quote(get_request_var('m_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>" , $binding["macip_scan_date"]) : $color_line_date . " " . $binding["macip_scan_date"]), $binding["macip_id"] );
+				
+				
+				if ($binding["macip_online"] == 1) {
+					form_checkbox_cell($binding["macip_ipaddr"], $binding["macip_id"]);
+				} else {
+					print "<td></td>";
+				}
+				form_end_row();			
+			 }
+	 
+			 /* put the nav bar on the bottom as well */
+			 print $nav;
+		 }else{
+			 print "<tr><td><em>No IMP Bindings found</em></td></tr>";
+		 }
 
-	html_end_box(false);
+		html_end_box(false);
 
-	if (sizeof($bindings)) {
-		print $nav;
+		if (sizeof($bindings)) {
+			print $nav;
+		}
+
+		form_end();	
 	}
-
-	form_end();	
-	
 	
 }
  

@@ -2070,7 +2070,7 @@ function bdcom_tabs() {
 		'epons'    		=> __('Epons'),
 		'ports'     	=> __('Ports'),
 		'onus'     		=> __('ONU'),		
-		'netadd'    	=> __('Auto Create'),
+		'netadd'    	=> __('Заявки'),
 		//'recentmacs' 	=> __('Scans'),
 		'info'     		=> __('Search')
 	);
@@ -2314,10 +2314,10 @@ function bdcom_mac_16_to_10($mac_address) {
 function  bdcom_update_auto_create($device_id = 0) {
 	
 	$create_ips = db_fetch_assoc("select i.net_id, d.hostname, d.description, ep.epon_descr, onu.onu_ipaddr, onu.onu_descr, onu.onu_name from plugin_bdcom_onu onu " .
-		" JOIN imb_auto_updated_nets i ON ((inet_aton(`onu_ipaddr`) & `net_mask`) = `net_ipaddr`) " .
+		" JOIN plugin_bdcom_podkl i ON ((inet_aton(`onu_ipaddr`) & `net_mask`) = `net_ipaddr`) " .
 		" LEFT JOIN plugin_bdcom_epons  ep  ON ep.epon_index = onu.onu_bindepon and ep.device_id=onu.device_id " .
 		" LEFT JOIN plugin_bdcom_devices d ON d.device_id = onu.device_id " .
-		" where i.net_type=2 ;");
+		" where i.net_type=2 and i.net_archive=0 ;");
 
 	if (sizeof($create_ips)) {
 		foreach($create_ips as $key => $create_ip) {
@@ -2325,7 +2325,7 @@ function  bdcom_update_auto_create($device_id = 0) {
 			$log_message = "BDCOM: Auto create ONU name=[" . $create_ip["onu_name"] . "], IP=[" .  $create_ip["onu_ipaddr"] . "], EPON=[" . $create_ip["epon_descr"] . "], on DEVICE=[" . $create_ip["hostname"] . "]. ";
 			
 			
-			$uid = db_fetch_cell(" SELECT lbv.uid FROM imb_auto_updated_nets i LEFT JOIN lb_staff lbs ON (i.net_ipaddr=lbs.segment) " .
+			$uid = db_fetch_cell(" SELECT lbv.uid FROM plugin_bdcom_podkl i LEFT JOIN lb_staff lbs ON (i.net_ipaddr=lbs.segment) " .
 			" LEFT JOIN lb_vgroups_s lbv ON (lbs.vg_id=lbv.vg_id) where i.net_id='" . $create_ip["net_id"] . "';");
 			bdcom_debug("BDCOM: Restore balance for net_id=" . $create_ip["net_id"] . ", uid=" . $uid);
 			$arrContextOptions=array(
@@ -2337,11 +2337,12 @@ function  bdcom_update_auto_create($device_id = 0) {
 			$rest_balance = file_get_contents('https://iserver.ion63.ru/admin/_cacti/cacti.php?uid=' . $uid . '&t=onu', false, stream_context_create($arrContextOptions));
 			bdcom_debug("BDCOM: rezult [" . print_r($rest_balance . "]", true));
 			cacti_log($log_message, TRUE);
+			db_execute("UPDATE `plugin_bdcom_podkl` SET net_archive=1, `net_change_time`=NOW(), `net_view_count`=0 WHERE `net_id`='" . $create_ip["net_id"] . "';");
 			db_execute("DELETE FROM `imb_auto_updated_nets` WHERE `net_id`='" . $create_ip["net_id"] . "';");
 		}
 	}
 	
-	db_execute("DELETE FROM `imb_auto_updated_nets` WHERE `net_ttl`<>0 and `net_type`='2' and DATE_ADD(imb_auto_updated_nets.net_change_time, INTERVAL  `net_ttl` HOUR) < NOW() ;");
+	//db_execute("DELETE FROM `imb_auto_updated_nets` WHERE `net_ttl`<>0 and `net_type`='2' and DATE_ADD(imb_auto_updated_nets.net_change_time, INTERVAL  `net_ttl` HOUR) < NOW() ;");
 }
 
 function bdcom_create_graphs() {
@@ -2650,12 +2651,35 @@ function bdcom_convert_free_2str($macip_free) {
 }
  
  
- function send_viber_msg($str_msg, $tel = "+79377999153 +79377999152"){
+ function send_viber_msg($str_msg, $param = array()){
 	
-	$ar_tel=preg_split("/[\s,]+/",$tel);
+	if (isset($param['tel'])) {
+		$ar_tel=preg_split("/[\s,]+/",$param['tel']);
+	}else{
+		$ar_tel=preg_split("/[\s,]+/",'+79377999152,+79377999153');
+	}
+	
+	if (isset($param['image_url'])) {
+		$image_url=$param['image_url'];
+	}else{
+		$image_url='';
+	}	
+
+	if (isset($param['url'])) {
+		$url=$param['url'];
+	}else{
+		//if we have url in text - change it
+		if (preg_match('/((https?\:\/\/)|(www\.))([\S]+)/', $str_msg, $mathes)) {
+			$url = $mathes[0];
+			$str_msg = str_replace($mathes[0],'',$str_msg);
+		}else{
+			$url='';
+		}
+	}	
+
 
 	foreach($ar_tel as $key => $t) {
-		db_execute("INSERT INTO sms.outbox (SendBefore,SendAfter,DestinationNumber, TextDecoded, CreatorID, Coding, SenderID) VALUES ('22:00:00','9:00:00','" . $t . "' , '" . $str_msg . "' , 'sys_bdcom', 'Default_No_Compression','0');");	
+		db_execute("INSERT INTO sms.outbox (SendBefore,SendAfter,DestinationNumber, TextDecoded, CreatorID, Coding, SenderID, url, image_url) VALUES ('22:00:00','9:00:00','" . $t . "' , '" . $str_msg . "' , 'sys_bdcom', 'Default_No_Compression','0','" . $url . "','" . $image_url . "');");	
 		//bdcom_debug("BDCOM ERROR: SEND MSG =[" . $str_msg . "] and  T=[" . $t . "] and TEL=[" . $tel . "] ");					
 	}
 	bdcom_debug($str_msg, true);					
@@ -2668,35 +2692,81 @@ function bdcom_alert_rxpower_change($device){
 	
 	if (read_config_option("bdcom_enable_msg_rx_change") == "1") {
 		
-		$ar_onus =  db_fetch_assoc ("SELECT o.*, vg.uid FROM plugin_bdcom_onu o LEFT JOIN lb_vgroups_s vg ON (o.onu_agrm_id = vg.agrm_id and vg.id=1) " . 
+		$ar_onus =  db_fetch_assoc ("SELECT o.*, vg.uid, gtg.local_graph_id FROM plugin_bdcom_onu o " .
+		" LEFT JOIN lb_vgroups_s vg ON (o.onu_agrm_id = vg.agrm_id and vg.id=1) " . 
+		" LEFT JOIN graph_templates_graph gtg ON title_cache LIKE CONCAT('%', o.onu_macaddr, '%Power%') " .
 		" WHERE onu_us_enduzelid <> 311 and `device_id`='" . $device["device_id"] . "' and onu_online=1 and ((ABS((onu_rxpower/onu_rxpower_average) - 1)*100) > 10) and  (UNIX_TIMESTAMP()-UNIX_TIMESTAMP(`onu_rxpower_alert_date`) > 3600) and onu_rxpower <> 0;");
 		
 
 		if (sizeof($ar_onus) > 0) {
-			if (sizeof($ar_onus) < 6) {
+	
+			if (sizeof($ar_onus) < 7) {
 				sleep (7);
 			}
 			foreach ($ar_onus as $key => $val) {
 				//если онушек меньше 5 - попробуем перепроверить уровень
-				if (sizeof($ar_onus) < 6) {
+				if (sizeof($ar_onus) < 7) {
 					sleep (1);
 					$onu=update_onu_power($val["onu_id"]);
 					//db_execute("UPDATE plugin_bdcom_onu SET `onu_txpower`='" . $onuTxPower . "', `onu_rxpower`='" . $onuRxPower . "', `onu_scan_date`='" . date('Y-m-d H:i:s') . "'  WHERE `onu_id`='" . $onu_id . "';");
-					cacti_log("WARNING: ONU RX RESTORE! IP=" . $onu["onu_ipaddr"] . " RX=" . round($onu["onu_rxpower"]/10,1) . ". WAS=" . round($val["onu_rxpower"]/10,1));
-					$val["onu_rxpower"] = $onu["onu_rxpower"];					
+					$onu["onu_last_rxpower"]=$val["onu_rxpower"];
+					$val["onu_rxpower"] = $onu["onu_rxpower"];
 				}
 				if ((ABS(($val["onu_rxpower"]/$val["onu_rxpower_average"]) - 1)*100) > 10) {
-					$str_sms = "WARNING: ONU RX CHANGE! IP=" . $val["onu_ipaddr"] . " RX=" . round($val["onu_rxpower"]/10,1) . ". AVG=" . round($val["onu_rxpower_average"]/10,1) . "  https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $val["onu_ipaddr"] ;
-					send_viber_msg($str_sms);
+					$str_sms = "WARNING: ONU RX CHANGE! IP=" . $val["onu_ipaddr"] . " RX=" . round($val["onu_rxpower"]/10,1) . ". AVG=" . round($val["onu_rxpower_average"]/10,1)  ;
+					$image_url = bdcom_file_power_from_onu($val['local_graph_id']);
+					
+					send_viber_msg($str_sms, array('url'=> "https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $val["onu_ipaddr"],'image_url'=>$image_url));
 					//$results1 = print_r($val, true);
-					cacti_log($str_sms);
+					cacti_log($str_sms . ' im_url=' . $image_url );
 					//cacti_log("BDCOM ERROR_2 = " . print_r($ar_onus, true), false, "bdcom_er2");
 					db_execute("UPDATE plugin_bdcom_onu SET `onu_rxpower_alert_date`=NOW() WHERE `onu_id`='" . $val["onu_id"] . "';");		
+				}else{
+					cacti_log("WARNING: ONU RX RESTORE! IP=" . $onu["onu_ipaddr"] . " RX=" . round($onu["onu_rxpower"]/10,1) . ". WAS=" . round($onu["onu_last_rxpower"]/10,1));					
 				}
 			}
 		}
 	}
 	
+}
+
+function bdcom_file_power_from_onu($lg_id){
+global $config;
+
+include_once($config["base_path"] . "/lib/rrd.php");
+
+$ret = '';
+$folder = $config["base_path"] . '/plugins/bdcom/grphs/';
+
+	if (isset($lg_id) and is_numeric($lg_id)) {
+		$graph_data_array = array(
+			'graph_start'   => time()-86400,
+			'graph_end'     => time(),
+			'image_format'  => 'png',
+			'graph_theme'   => 'modern',
+			'output_flag'   => RRDTOOL_OUTPUT_STDOUT,
+			'disable_cache' => true,
+			'graph_nolegend'=> true
+		);		
+		if (is_writeable($folder)) {
+		
+			$image = rrdtool_function_graph($lg_id, '', $graph_data_array, '');
+
+			if (strlen($image) > 50) {
+				$file_name = md5($image) . '.png';
+				if (file_put_contents($folder . $file_name, $image) === false) {
+					cacti_log('ERROR: write file ' . $folder . $file_name );					
+				}else{
+					$ret = 'http://sys.ion63.ru/' . 'plugins/bdcom/grphs/' . $file_name;	
+					cacti_log('ERROR: file created =' . $ret . ' by user=' . get_current_user());
+					chmod($folder . $file_name, 644);
+				}
+			}
+		}else{
+			cacti_log('ERROR: NOT WRITABLE DIR [' . $folder . ']' );
+		}
+	}
+return $ret;
 }
 
 
@@ -3148,7 +3218,7 @@ function bdcom_isJson($string) {
  $port_string = "";
 
 	$xport = str_replace(array(':',' '),'',$xport);
-	$arr_xport = str_split($xport,4);
+	$arr_xport = str_split($xport);
 
 	 foreach ($arr_xport as $str_xport) {
 		 $port_string = $port_string . sprintf("%04b", hexdec($str_xport));
@@ -3270,6 +3340,74 @@ function bdcom_form_alternate_row($row_id = '', $light = false, $disabled = fals
 		print "<tr class='$class tableRow'  " . (strlen($style) ? " style='$style;'" : "") . "  id='$row_id'>\n";
 	} else {
 		print "<tr class='$class  " . (strlen($style) ? " style='$style;'" : "") . "  tableRow'>\n";
+	}
+}
+
+
+function bdcom_update_podlk(){
+	global $ion_us_urlapi;
+	
+
+	
+	$ar_podlk =  db_fetch_assoc ("SELECT * FROM plugin_bdcom_podkl LEFT JOIN lb_vgroups_s v using (vg_id) where net_gepon=1 and net_type=2 and net_uzelid=0;");
+	
+
+	if (sizeof($ar_podlk) > 0) {
+		if (strlen($ion_us_urlapi) > 15){
+				
+			$arrContextOptions=array(
+				'ssl'=>array(
+					'verify_peer'=>false,
+					'verify_peer_name'=>false,
+				),
+				'http' => array('ignore_errors' => true),
+			);		
+			foreach ($ar_podlk as $key => $podkl) {
+				if (isset($podkl['ag_num'])){
+					$str_us_uzel_agr = file_get_contents($ion_us_urlapi . '&cat=node&action=get_id&data_type=additional_data2&data_value=' . $podkl['ag_num'] . '&is_entry=0', false, stream_context_create($arrContextOptions));
+						if (bdcom_isJson($str_us_uzel_agr)) {
+							$ar_us_uzel_agr=json_decode($str_us_uzel_agr, true);
+								if (is_array($ar_us_uzel_agr) and count($ar_us_uzel_agr) == 2 and $ar_us_uzel_agr['Result']=="OK") {
+									if ((isset($ar_us_uzel_agr['Id'])) and is_integer($ar_us_uzel_agr['Id'])) {
+										$id_uzel = $ar_us_uzel_agr['Id'];
+										$id_uzel2 = 0;
+										$distance = 0;
+										// теперь получим сам объек узла связи в доме абонента
+										$str_us_uzel = file_get_contents($ion_us_urlapi . '&cat=node&action=get&id=' . $id_uzel, false, stream_context_create($arrContextOptions));
+											if (bdcom_isJson($str_us_uzel)) {
+												$ar_us_uzel=json_decode($str_us_uzel, true);
+												if (is_array($ar_us_uzel) and count($ar_us_uzel) == 2 and $ar_us_uzel['Result']=="OK" and isset($ar_us_uzel['data'][$id_uzel]['coordinates']['lat']) and isset($ar_us_uzel['data'][$id_uzel]['coordinates']['lon']) ) {
+													$str_us_uzel2 = file_get_contents($ion_us_urlapi . '&cat=node&action=get_id_by_coord&lat=' . $ar_us_uzel['data'][$id_uzel]['coordinates']['lat'] . '&lon=' . $ar_us_uzel['data'][$id_uzel]['coordinates']['lon'] .'&type=1', false, stream_context_create($arrContextOptions));
+														if (bdcom_isJson($str_us_uzel2)) {
+															$ar_us_uzel2=json_decode($str_us_uzel2, true);
+																if (is_array($ar_us_uzel2) and count($ar_us_uzel2) > 2 and $ar_us_uzel2['Result']=="OK") {
+																	if ((isset($ar_us_uzel2['id'])) and is_integer($ar_us_uzel2['id'])) {
+																		$id_uzel2 = $ar_us_uzel2['id'];
+																		$distance = $ar_us_uzel2['distance'];
+																	}
+																}
+															
+														}
+													
+												}
+											}
+										//
+										db_execute('UPDATE  plugin_bdcom_podkl SET `net_uzelid`=' . $id_uzel . ',`net_uzelid2`=' . $id_uzel2 . ',`distance`=' . $distance . ' WHERE `net_id`=' . $podkl['net_id']);
+										//cacti_log("WARNING: ONU RX RESTORE! IP=" . $onu["onu_ipaddr"] . " RX=" . round($onu["onu_rxpower"]/10,1) . ". WAS=" . round($val["onu_last_rxpower"]/10,1));
+
+									}								
+								}
+							
+						}else{
+							cacti_log("WARNING: BDCOM not found uzel for agrm = " . $podkl['ag_num'] );
+						}
+					
+				}
+				
+				
+				//cacti_log("WARNING: ONU RX RESTORE! IP=" . $onu["onu_ipaddr"] . " RX=" . round($onu["onu_rxpower"]/10,1) . ". WAS=" . round($val["onu_last_rxpower"]/10,1));					
+			}
+		}
 	}
 }
  

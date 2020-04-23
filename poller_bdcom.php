@@ -376,6 +376,8 @@
 			}
 	
 		bdcom_create_graphs();
+		
+		bdcom_update_podlk();
 	
 	
 	

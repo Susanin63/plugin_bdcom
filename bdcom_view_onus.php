@@ -365,7 +365,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '64', $apply_limits = T
 
  
  function bdcom_view_onus() {
-    global $title, $report, $colors, $rows_selector, $config, $onu_actions;
+    global $title, $report, $colors, $rows_selector, $config, $onu_actions, $ion_us_url;
  
  	print "<div id='element_to_pop_ping'>
 			<a class='b-close'>x<a/>
@@ -518,12 +518,12 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '64', $apply_limits = T
 			if ($old_uzelid != $onu["onu_us_enduzelid"]) {
 				//print "";
 				print "<tr bgcolor='#DEB887'>
-                 <td align='center' colspan='16'>
+                 <td align='center' colspan='17'>
 					<a class='linkEditMain'  href='https://sys.ion63.ru/plugins/bdcom/bdcom_view_onus.php?report=onus&device_id=-1&rows_selector=-1&mac_filter_type_id=1&mac_filter=&filter=&ip_filter_type_id=1&ip_filter=&epon_id=-1&status=-1&sost=-1&firm=-1&uzel_id=" . $onu["onu_us_enduzelid"] . "'> [(" . $onu["onu_us_enduzelid"] . ") " . $onu["onu_us_enduzel_descr"] . "] " .  
-					"<a class='linkEditMain'  href='https://us.ion63.ru/oper/index.php?core_section=node&action=show&id=" . $onu["onu_us_enduzelid"] . "'>  открыть в US " ;
+					"<a class='linkEditMain'  href='" . $ion_us_url . "/oper/index.php?core_section=node&action=show&id=" . $onu["onu_us_enduzelid"] . "'>  открыть в US " ;
 					
 					if (isset($us_onu_list[$onu["onu_us_enduzelid"]])) {
-						print "<a class='linkEditMain'  href='http://us.ion63.ru/oper/index.php?core_section=map&action=show&only_custom_load=1&device_list_id=" . $us_onu_list[$onu["onu_us_enduzelid"]]['lst'] . "&is_with_device_info=1&by_device=" . $onu["onu_us_onuid"] . "'>  ONU на карте ";
+						print "<a class='linkEditMain'  href='" . $ion_us_url . "/oper/index.php?core_section=map&action=show&only_custom_load=1&device_list_id=" . $us_onu_list[$onu["onu_us_enduzelid"]]['lst'] . "&is_with_device_info=1&by_device=" . $onu["onu_us_onuid"] . "'>  ONU на карте ";
 					}
 					
                 print  "</td>
@@ -557,9 +557,10 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '64', $apply_limits = T
 
 
  function bdcom_format_onu_row($onu, $actions=false, $only_1_dev = true, $only_1_epon = true) {
-	global $config;
+	global $config, $ion_us_url;
 	
 	$webroot = $config['url_path'] . 'plugins/bdcom/';
+
 
 	/* viewer level */
 	if ($actions) {
@@ -667,7 +668,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '64', $apply_limits = T
 		//name
 		form_selectable_cell((strlen(get_request_var('filter')) ? preg_replace("/(" . preg_quote(get_request_var('filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $onu["onu_name"]) : $onu["onu_name"]) . "</a>" . (false ? '' : " <a class='linkEditMain' href='". htmlspecialchars($config['url_path'] . "graph_ion_view.php?action=preview&host_id=" . $onu['id'] . "&snmp_index=&rfilter=" . $onu["onu_name"] ) . "$'><img src='" . $webroot . "images/view_graphs.gif' border='0' alt='' title='View Graph' align='absmiddle'></a>") , $onu["onu_id"]);
 		//us uzel
-		form_selectable_cell("<a class='linkEditMain' TITLE='" . $onu["onu_us_enduzel_descr"] . "' href='https://us.ion63.ru/oper/uzel.php?type=vols&code=" . $onu["onu_us_enduzelid"] . "'>" . 
+		form_selectable_cell("<a class='linkEditMain' TITLE='" . $onu["onu_us_enduzel_descr"] . "' href='" . $ion_us_url . "/oper/uzel.php?type=vols&code=" . $onu["onu_us_enduzelid"] . "'>" . 
  				$onu["onu_us_enduzelid"] . "</a>", $onu["onu_id"]);		
 		//descr
 		form_selectable_cell(filter_value($onu["onu_descr"], get_request_var('filter')), $onu["onu_id"] );			
@@ -1275,6 +1276,7 @@ function bdcom_onu_filter() {
  					</td>
  					<td width="1">
  						<select id='epon_id' onChange='applyFilter()'>
+							<option value="-1"<?php if (get_request_var('epon_id') == "-1") {?> selected<?php }?>><?php print __('Any');?></option>
 							<?php
 								if (get_request_var('device_id') !== "-1") {
 									$str_eponsql = " SELECT epon_id, epon_name, epon_descr FROM plugin_bdcom_epons WHERE device_id = '" . get_request_var('device_id') . "' order by epon_id ";
@@ -1341,6 +1343,7 @@ function bdcom_onu_filter() {
 			strURL += '&mac_filter_type_id=' + $('#mac_filter_type_id').val();
 			strURL += '&mac_filter=' + $('#mac_filter').val();
 			strURL += '&epon_id=-1';
+			strURL += '&uzel_id=' + $('#uzel_id').val();
 			strURL += '&rows=' + $('#rows').val();
 			loadPageNoHeader(strURL);
 		}

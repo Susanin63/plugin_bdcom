@@ -100,7 +100,7 @@ function bdcom_show_tab () {
  function bdcom_config_arrays () {
  	global $user_auth_realms, $menu,$user_auth_realm_filenames, $bdcom_snmp_versions;
  	global $bdcom_search_types, $bdcom_port_search_types, $bdcom_search_recent_date, $bdcom_poller_frequencies;
- 	global $dbcom_timespans;
+ 	global $dbcom_timespans, $bdcom_search_nettype, $bdcom_search_adress, $bdcom_podkl_type, $bdcom_podkl_status;
 
 
  
@@ -133,7 +133,17 @@ function bdcom_show_tab () {
      7 => "Is Null",
      8 => "Is Not Null");	  
  
- 	    
+    $bdcom_search_nettype = array(
+     1 => 'Any',
+     2 => "В работе",
+     3 => "Пауза");	
+	 
+    $bdcom_search_adress = array(
+     1 => 'Any',
+     2 => "Усть-Кинельский",
+     3 => "Алексеевка",
+     4 => "Советы");	
+	 
      $bdcom_port_search_types = array(
      1 => '',
      2 => "Состоит",
@@ -185,6 +195,41 @@ $bdcom_poller_frequencies = array(
 		"480" => "Every 8 Hours",
 		"720" => "Every 12 Hours",
 		"1440" => "Every Day");		
+
+
+$bdcom_podkl_type = array(
+	'gepon' => array(
+		'display' => __('GePON NEW', 'bdcom'),
+		'class' => 'podlkGepon'
+	),
+	'2gepon' => array(
+		'display' => __('Move 2 GePON', 'bdcom'),
+		'class' => 'podlkMove2Gepon'
+	),
+	'ethernet' => array(
+		'display' => __('Ethernet', 'bdcom'),
+		'class' => 'podlkEthernet'
+	),
+	'done' => array(
+		'display' => __('Подключено', 'bdcom'),
+		'class' => 'podlkDone'
+	)
+);
+
+$bdcom_podkl_status = array(
+	'work' => array(
+		'display' => __('В работе', 'bdcom'),
+		'class' => 'podklStatWork'
+	),
+	'pause' => array(
+		'display' => __('Приостановлено', 'bdcom'),
+		'class' => 'podklStatPause'
+	),
+	'done' => array(
+		'display' => __('Подключено', 'bdcom'),
+		'class' => 'podklStatDone'
+	)
+);
  
  }
  
@@ -1564,7 +1609,7 @@ function bdcom_regex_device($matches) {
 	if (!empty($matches[2])) {
 		$devs = db_fetch_assoc("SELECT * FROM plugin_bdcom_devices where hostname='" . $matches[2] . "'");
 		if (is_array($devs) and (cacti_sizeof($devs) == 1)) {
-			//https://sys.ion63.ru/plugins/bdcom/bdcom_view_epons.php?report=epons&device_id=+1&port_filter_type_id=&port_filter=&filter=
+
 			$result = $matches[1].'<a href=\'' . html_escape($config['url_path'] . 'plugins/bdcom/bdcom_view_epons.php?report=epons&device_id=+' . $devs[0]['device_id'] . '&port_filter_type_id=&port_filter=&filter=') . '\'>' . (isset($devs[0]['description']) ? $devs[0]['description']:$matches[2]) . '</a>' . $matches[3];
 		}
 	}

@@ -436,7 +436,6 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '64', $apply_limits = T
 						$dev_info .= " <td align='center' > ";
 							if (isset($onus_epons[$epon['epon_name']])) {
 
-								//https://sys.ion63.ru/plugins/bdcom/bdcom_view_onus.php?report=onus&device_type_id=-1&device_id=+3&epon_id=&status=-1&status=-1&filter=&page=1
 							 //$dev_info .= " <a class='linkEditMain' href='bdcom_view_onus.php?report=onus&    device_type_id=-1&device_id=" . $onus['0']['device_id'] . "&epon_id=" .  $epon['epon_id'] . "&status=-1&filter=&page=1>" . $epon['epon_name']  . "</a>" ;
 								$dev_info .= "<a class='linkEditMain' href='bdcom_view_onus.php?report=onus&amp;o_device_type_id=-1&device_id=" . $onus['0']["device_id"] . "&epon_id=" .  $epon['epon_id'] . "&ip_filter_type_id=1&ip_filter=&status=-1&filter=&uzel_id=-1&page=1'>" . "<span style='background-color: #F8D93D;'>" . $epon['epon_name'] . "<br>"  . " (" . $epon['epon_descr']  . ")</span></a>";
 							}else{
@@ -519,7 +518,7 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '64', $apply_limits = T
 				//print "";
 				print "<tr bgcolor='#DEB887'>
                  <td align='center' colspan='17'>
-					<a class='linkEditMain'  href='https://sys.ion63.ru/plugins/bdcom/bdcom_view_onus.php?report=onus&device_id=-1&rows_selector=-1&mac_filter_type_id=1&mac_filter=&filter=&ip_filter_type_id=1&ip_filter=&epon_id=-1&status=-1&sost=-1&firm=-1&uzel_id=" . $onu["onu_us_enduzelid"] . "'> [(" . $onu["onu_us_enduzelid"] . ") " . $onu["onu_us_enduzel_descr"] . "] " .  
+					<a class='linkEditMain'  href='bdcom_view_onus.php?report=onus&device_id=-1&rows_selector=-1&mac_filter_type_id=1&mac_filter=&filter=&ip_filter_type_id=1&ip_filter=&epon_id=-1&status=-1&sost=-1&firm=-1&uzel_id=" . $onu["onu_us_enduzelid"] . "'> [(" . $onu["onu_us_enduzelid"] . ") " . $onu["onu_us_enduzel_descr"] . "] " .  
 					"<a class='linkEditMain'  href='" . $ion_us_url . "/oper/index.php?core_section=node&action=show&id=" . $onu["onu_us_enduzelid"] . "'>  открыть в US " ;
 					
 					if (isset($us_onu_list[$onu["onu_us_enduzelid"]])) {

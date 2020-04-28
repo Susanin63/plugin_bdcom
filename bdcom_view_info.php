@@ -178,7 +178,9 @@ function bdcom_view_get_onu_records(&$sql_where, $rows = '30', $apply_limits = T
  		$sortby = "ABS(f_flat)";
  	}elseif($sortby=="onu_name") {
  		$sortby = " plugin_bdcom_epons.epon_name, LENGTH(onu_name), onu_name ";
-	}	
+	}elseif($sortby=="onu_id") {
+ 		$sortby = " onu_id ";
+	}
 	
 	if ($apply_limits) {
 		$sql_limit = ' LIMIT ' . ($rows*(get_request_var('page')-1)) . ', ' . $rows;
@@ -577,7 +579,7 @@ function bdcom_view_get_info_macips_records(&$sql_where, $apply_limits = TRUE, $
 		left JOIN (SELECT * FROM lb_vgroups_s WHERE lb_vgroups_s.id is null or lb_vgroups_s.id =1)  lbv  ON plugin_bdcom_onu.onu_agrm_id = lbv.agrm_id	
         $sql_where");
  
-	if (sizeof($onus) == 1) {
+	if (is_array($onus) and  cacti_sizeof($onus) == 1) {
 		$ip_full_info = db_fetch_assoc("SELECT login, blocked,balance, ag_num, f_addr, f_flat, equipm_rtr, mobile, l.vg_id, onu_ipaddr , agrm_id " .
 			" FROM plugin_bdcom_onu o " .
 				" LEFT JOIN lb_staff l ON (l.ip=o.onu_ipaddr ) " .

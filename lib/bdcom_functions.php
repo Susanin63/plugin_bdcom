@@ -2312,6 +2312,7 @@ function bdcom_mac_16_to_10($mac_address) {
 }
 
 function  bdcom_update_auto_create($device_id = 0) {
+	global $config;
 	
 	$create_ips = db_fetch_assoc("select i.net_id, d.hostname, d.description, ep.epon_descr, onu.onu_ipaddr, onu.onu_descr, onu.onu_name from plugin_bdcom_onu onu " .
 		" JOIN plugin_bdcom_podkl i ON ((inet_aton(`onu_ipaddr`) & `net_mask`) = `net_ipaddr`) " .
@@ -2327,18 +2328,21 @@ function  bdcom_update_auto_create($device_id = 0) {
 			
 			$uid = db_fetch_cell(" SELECT lbv.uid FROM plugin_bdcom_podkl i LEFT JOIN lb_staff lbs ON (i.net_ipaddr=lbs.segment) " .
 			" LEFT JOIN lb_vgroups_s lbv ON (lbs.vg_id=lbv.vg_id) where i.net_id='" . $create_ip["net_id"] . "';");
-			bdcom_debug("BDCOM: Restore balance for net_id=" . $create_ip["net_id"] . ", uid=" . $uid);
-			$arrContextOptions=array(
-				"ssl"=>array(
-					"verify_peer"=>false,
-					"verify_peer_name"=>false,
-				),
-			);
-			$rest_balance = file_get_contents('https://iserver.ion63.ru/admin/_cacti/cacti.php?uid=' . $uid . '&t=onu', false, stream_context_create($arrContextOptions));
-			bdcom_debug("BDCOM: rezult [" . print_r($rest_balance . "]", true));
+
+			if (api_plugin_is_enabled('ion') and file_exists($config["base_path"] . '/plugins/ion/ion_functions.php')) {
+				include_once($config["base_path"] . '/plugins/ion/ion_functions.php');
+				bdcom_debug("BDCOM: Restore balance for net_id=" . $create_ip["net_id"] . ", uid=" . $uid);
+				$rest_balance = ion_activate_uid($uid, 'onu');
+				bdcom_debug("BDCOM: rezult [" . print_r($rest_balance . "]", true));
+			}else{
+				bdcom_debug("BDCOM: Cancel Restore balance for net_id=" . $create_ip["net_id"] . ", uid=" . $uid);
+			}			
 			cacti_log($log_message, TRUE);
 			db_execute("UPDATE `plugin_bdcom_podkl` SET net_archive=1, `net_change_time`=NOW(), `net_view_count`=0 WHERE `net_id`='" . $create_ip["net_id"] . "';");
-			db_execute("DELETE FROM `imb_auto_updated_nets` WHERE `net_id`='" . $create_ip["net_id"] . "';");
+			if (api_plugin_is_enabled('ipmb')) {
+				db_execute("DELETE FROM `imb_auto_updated_nets` WHERE `net_ipaddr`=inet_aton(" . $create_ip["onu_ipaddr"] . ");");
+			}			
+
 		}
 	}
 	
@@ -2689,6 +2693,11 @@ function bdcom_convert_free_2str($macip_free) {
 
 function bdcom_alert_rxpower_change($device){
 
+	if (isset($_SERVER['HTTPS']) and isset($_SERVER['HTTP_HOST']) ) {
+		$server_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+	}else{
+		$server_url = read_config_option('ion_cacti_url');
+	}
 	
 	if (read_config_option("bdcom_enable_msg_rx_change") == "1") {
 		
@@ -2716,7 +2725,7 @@ function bdcom_alert_rxpower_change($device){
 					$str_sms = "WARNING: ONU RX CHANGE! IP=" . $val["onu_ipaddr"] . " RX=" . round($val["onu_rxpower"]/10,1) . ". AVG=" . round($val["onu_rxpower_average"]/10,1)  ;
 					$image_url = bdcom_file_power_from_onu($val['local_graph_id']);
 					
-					send_viber_msg($str_sms, array('url'=> "https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $val["onu_ipaddr"],'image_url'=>$image_url));
+					send_viber_msg($str_sms, array('url'=> $server_url . "/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $val["onu_ipaddr"],'image_url'=>$image_url));
 					//$results1 = print_r($val, true);
 					cacti_log($str_sms . ' im_url=' . $image_url );
 					//cacti_log("BDCOM ERROR_2 = " . print_r($ar_onus, true), false, "bdcom_er2");
@@ -2737,6 +2746,11 @@ include_once($config["base_path"] . "/lib/rrd.php");
 
 $ret = '';
 $folder = $config["base_path"] . '/plugins/bdcom/grphs/';
+if (isset($_SERVER['HTTPS']) and isset($_SERVER['HTTP_HOST']) ) {
+	$server_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+}else{
+	$server_url = read_config_option('ion_cacti_url');
+}
 
 	if (isset($lg_id) and is_numeric($lg_id)) {
 		$graph_data_array = array(
@@ -2757,7 +2771,7 @@ $folder = $config["base_path"] . '/plugins/bdcom/grphs/';
 				if (file_put_contents($folder . $file_name, $image) === false) {
 					cacti_log('ERROR: write file ' . $folder . $file_name );					
 				}else{
-					$ret = 'http://sys.ion63.ru/' . 'plugins/bdcom/grphs/' . $file_name;	
+					$ret = $server_url . '/plugins/bdcom/grphs/' . $file_name;	
 					cacti_log('ERROR: file created =' . $ret . ' by user=' . get_current_user());
 					chmod($folder . $file_name, 644);
 				}
@@ -2769,85 +2783,6 @@ $folder = $config["base_path"] . '/plugins/bdcom/grphs/';
 return $ret;
 }
 
-
-function send_viber(){
-	global $config;
-	
-
-$config = require($config["base_path"] . "/vb/config.php");
-$apiKey = $config['apiKey'];
-//$service_url = 'https://chatapi.viber.com/pa/get_user_details';
-$send_url = 'https://chatapi.viber.com/pa/send_message';
-$test=true;
-	
-	//echo "01";
-	$sql_vbs = "SELECT o.*, v.ID as receiver_id, TextDecoded as TextDecoded2,  " .
-	" TIMESTAMPDIFF(MINUTE,o.SendingTimeOut,o.InsertIntoDB) as timeout " .
-	" FROM `sms`.`outbox` o " .
-	" left join sms.vb_users v on (o.DestinationNumber=v.PhoneNumber) " .
-	" where SenderID = 'viber1' and `SendBefore` > CURTIME() and `SendAfter` < CURTIME() and `SendingTimeOut` < NOW();";
-	$out_vbs = db_fetch_assoc($sql_vbs);	
-	if ((sizeof($out_vbs)>0) && $test) {
-	
-		foreach($out_vbs as $key => $out_vb) {
-			
-			$curl = curl_init($send_url);
-			$curl_post_data = array(
-					'message' 		=> $out_vb["TextDecoded2"],
-					'text' 			=> $out_vb["TextDecoded2"],
-					'receiver' 		=> $out_vb["receiver_id"],
-					'type' 			=> 'text',
-					'tracking_data' => 'tracking data',
-					'sender.name' 	=> 'ion63.ru',
-					'sender.avatar' => 'http://sys.ion63.ru/vb/ion63_logo1.jpg'
-			);	
-
-			$data_string = json_encode($curl_post_data); 
-			curl_setopt($curl, CURLOPT_HTTPHEADER, array(
-				'Content-Type: application/json',
-				'X-Viber-Auth-Token: ' . $apiKey
-				));
-			curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($curl, CURLOPT_POST, true);
-			curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
-			curl_setopt($curl, CURLOPT_POSTFIELDS, $data_string);
-			$curl_response = curl_exec($curl);
-			
-			//: string = "{\"status\":0,\"status_message\":\"ok\",\"message_token\":5055004995223964101}"
-			if (isJson($curl_response)){
-				$js_resp = json_decode($curl_response, true);
-				if (isset($js_resp["status"])){
-					switch ($js_resp["status"]) {
-						case "0":
-							$rez = db_execute ("INSERT INTO `sms`.`sentitems` (`CreatorID`,`ID`,`SequencePosition`,`Status`, " .
-							"`SendingDateTime`,`SMSCNumber`,`TPMR`,`SenderID`,`Text`,`DestinationNumber`,`Coding`, " .
-							" `UDH`,`Class`,`TextDecoded`,`InsertIntoDB`,`RelativeValidity`,`cost`,`vb_mes_token`) " .
-							" VALUES('" . $out_vb["CreatorID"] . "','" . $out_vb["ID"] . "',1,'SendingOK', " .
-							" NOW(), '',-1,'viber','','" . $out_vb["DestinationNumber"] . "','Unicode_No_Compression', " .
-							" '',-1,'" . $out_vb["TextDecoded2"] . "','" . $out_vb["InsertIntoDB"] . "',255,'0','" . $js_resp["message_token"] . "');");
-							if ($rez == 1) {
-								db_execute ("DELETE FROM `sms`.`outbox` WHERE `ID`='" . $out_vb["ID"] . "';");
-							}							
-							break;
-						case "6":
-							//"{\"status\":6,\"status_message\":\"notSubscribed\",\"message_token\":5055297682581900098}"
-							db_execute ("UPDATE `sms`.`outbox` SET `SenderID` = 'err' WHERE `ID`='" . $out_vb["ID"] . "';");	
-							break;							
-						default:
-							if ($out_vb["timeout"] < 20) {
-								db_execute ("UPDATE `sms`.`outbox` SET `SendingTimeOut` = `SendingTimeOut` + INTERVAL 5 MINUTE, `Retries`=`Retries`+1 WHERE `ID`='" . $out_vb["ID"] . "';");	
-							}
-							break;
-					}
-				
-				}
-			}
-			
-			curl_close($curl);
-		
-		}
-	}
-}
 
 
  function bdcom_api_delete_onu($onu_row, $device_id){
@@ -3409,6 +3344,20 @@ function bdcom_update_podlk(){
 			}
 		}
 	}
+}
+
+function podkl_legend() {
+	global $bdcom_podkl_status, $bdcom_podkl_type;
+
+	html_start_box('', '100%', false, '3', 'center', '');
+
+	print '<tr>';
+	foreach (array_merge($bdcom_podkl_type, $bdcom_podkl_status) as $index => $state) {
+		print "<td class='" . $state['class'] . "'>" . $state['display'] . "</td>";
+	}
+	print '</tr>';
+
+	html_end_box(false);
 }
  
  ?>

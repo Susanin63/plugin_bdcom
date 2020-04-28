@@ -103,6 +103,11 @@ if (preg_match("/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\,\s]+(\d{6,})[\,\s]*(ONU
 		
 			$onu_row =  db_fetch_row ("SELECT o.*, vg.uid, local_graph_id FROM plugin_bdcom_onu o LEFT JOIN lb_vgroups_s vg ON (o.onu_agrm_id = vg.agrm_id) LEFT JOIN graph_templates_graph gtg ON title_cache LIKE CONCAT('%', o.onu_macaddr, '%Power%')  WHERE onu_macaddr='" . $matches["onu_mac"] . "' and `device_id`='" . $device["device_id"] . "';");
 			if (sizeof($onu_row) > 0){
+					if (isset($_SERVER['HTTPS']) and isset($_SERVER['HTTP_HOST']) ) {
+						$server_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+					}else{
+						$server_url = read_config_option('ion_cacti_url');
+					}
 					//обновим запись
 					$str_degr_status = "";
 					if ($matches[5] == "deregistered") {
@@ -130,9 +135,9 @@ if (preg_match("/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\,\s]+(\d{6,})[\,\s]*(ONU
 									if (isset($onu_row["local_graph_id"])) {
 										$image_url=bdcom_file_power_from_onu($onu_row["local_graph_id"]);
 									}
-									send_viber_msg(date('[H:i] ') ."BDCOM FIBER DOWN: ONU_IP=[" . $onu_row["onu_ipaddr"] . " MAC=[" . $matches["onu_mac"] . "] DEV=[" . $matches[1] . "]", array('url'=>"https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $onu_row["onu_ipaddr"], 'image_url'=>$image_url));
+									send_viber_msg(date('[H:i] ') ."BDCOM FIBER DOWN: ONU_IP=[" . $onu_row["onu_ipaddr"] . " MAC=[" . $matches["onu_mac"] . "] DEV=[" . $matches[1] . "]", array('url'=>$server_url . "/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $onu_row["onu_ipaddr"], 'image_url'=>$image_url));
 								}else{
-									//send_viber_msg(date('[H:i] ') ."BDCOM SKIP FIBER1 DOWN: ONU_IP=[" . $onu_row["onu_ipaddr"] . " MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "]  https://sys.ion63.ru/graph_vg_view.php?uid=" . $onu_row["uid"], "+79377999153");
+
 								}
 							db_execute("UPDATE plugin_bdcom_onu SET `onu_wait_up`=0 WHERE onu_id='" . $onu_row["onu_id"] . "';");
 						}
@@ -167,7 +172,7 @@ if (preg_match("/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})[\,\s]+(\d{6,})[\,\s]*(ONU
 								if (isset($onu_row["local_graph_id"])) {
 									$image_url=bdcom_file_power_from_onu($onu_row["local_graph_id"]);
 								}								
-								send_viber_msg(date('[H:i] ') ."BDCOM FIBER UP: ONU_IP=[" . $onu_row["onu_ipaddr"] . "] MAC=[" . $matches["onu_mac"] . "]  DEV=[" . $matches[1] . "]", array('url'=>"https://sys.ion63.ru/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $onu_row["onu_ipaddr"],'image_url'=>$image_url));
+								send_viber_msg(date('[H:i] ') ."BDCOM FIBER UP: ONU_IP=[" . $onu_row["onu_ipaddr"] . "] MAC=[" . $matches["onu_mac"] . "]  DEV=[" . $matches[1] . "]", array('url'=>$server_url."/graph_ion_view.php?action=preview&host_id=-1&snmp_index=&rfilter=" . $onu_row["onu_ipaddr"],'image_url'=>$image_url));
 							}							
 						}else{
 							bdcom_debug("BDCOM MOVE:  MAC=[" . $matches["onu_mac"] . "] and  DEV=[" . $matches[1] . "], is found on other PON NUMBER=[" . $matches[8] . "], ONU_ID=[" . $onu_row["onu_id"] . "].");					

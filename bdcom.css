@@ -26,3 +26,53 @@
 .fit_div {
     display: inline; /* Or inline-block */
 }
+
+.podlkGepon {
+	background-color: #00FF00;
+	text-align: center;
+	white-space: nowrap;
+	padding: 3px;
+}
+.podlkMove2Gepon {
+	background-color: #008000;
+	text-align: center;
+	white-space: nowrap;
+	padding: 3px;
+}
+.podlkEthernet {
+	background-color: #F0E68C;
+	text-align: center;
+	white-space: nowrap;
+	padding: 3px;
+}
+.podlkDone {
+	background-color: #A9A9A9;
+	text-align: center;
+	white-space: nowrap;
+	padding: 3px;
+}
+.podklStatDone {
+	background-color: #A9A9A9;
+	text-align: center;
+	white-space: nowrap;
+	padding: 3px;
+}
+.podklStatPause {
+	background-color: #EE82EE;
+	text-align: center;
+	white-space: nowrap;
+	padding: 3px;
+}
+.podklStatWork {
+	background-color: #00FF00;
+	text-align: center;
+	white-space: nowrap;
+	padding: 3px;
+}
+.captionColumn {
+	background-color: #ff8f1e;
+	text-align: center;
+	white-space: nowrap;
+	width: 14%;
+	padding: 3px;
+}

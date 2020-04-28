@@ -83,6 +83,36 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 		 case "8": // is not null 
 			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " INET_NTOA(n.net_ipaddr) != ''";
 	}
+
+	switch (get_request_var('net_type_id')) {
+		 case "1": // do not filter 
+			 break;
+		 case "2": // in work 
+			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " net_do_status='0'";
+			 break;
+		 case "3": // pause 
+			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " net_do_status='1'";
+			 break;
+		 case "3": // gepon 
+			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " net_gepon = '1'";
+			 break;
+
+	}
+
+	switch (get_request_var('net_adress_id')) {
+		 case "1": // do not filter 
+			 break;
+		 case "2": // Ust-kinel 
+			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " net_adress LIKE '%Усть-Кине%'";
+			 break;
+		 case "3": // Alexeevka
+			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " net_adress LIKE '%Алексеевка%'";
+			 break;
+		 case "4": // Sovet 
+			  $sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " net_adress LIKE '%п Советы%'";
+			 break;
+
+	}
 	
 	$sql_where .= (strlen($sql_where) ? ' AND ': 'WHERE ') . " (n.`net_archive`=0 or ( n.`net_archive`=1 and n.`net_view_count` < 10) or ( n.`net_archive`=1 and datediff(now(),net_change_time)=0)) ";
 	
@@ -147,7 +177,7 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 			'pageset' => true
 			),
 		'ip_filter_type_id' => array(
-			'filter' => FILTER_SANITIZE_STRING,
+			'filter' => FILTER_VALIDATE_INT,
 			'default' => '1',
 			'pageset' => true
 			),			
@@ -156,7 +186,11 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 			'default' => '',
 			'pageset' => true
 			),		
-
+		'net_type_id' => array(
+			'filter' => FILTER_VALIDATE_INT,
+			'default' => '1',
+			'pageset' => true
+			),	
 			
 	);
 
@@ -202,7 +236,7 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
  		'agr_date' => array(__('Дата', 'bdcom'), 'ASC'),
 		'ag_num' => array(__('Договор', 'bdcom'), 'ASC'),
 		'ipa' => array(__('IP', 'bdcom'), 'ASC'),
- 		'net_ttl_date' => array(__('TTL', 'bdcom'), 'ASC'),
+ 		'net_do_status' => array(__('Статус', 'bdcom'), 'ASC'),
 		'net_uzelid' => array(__('Узел', 'bdcom'), 'ASC'),
 		'net_uzelid2' => array(__('Бокс', 'bdcom'), 'ASC'),
  		'net_adress' => array(__('Adress', 'bdcom'), 'ASC'),
@@ -224,7 +258,7 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 	if (cacti_sizeof($nets)) {
 		foreach ($nets as $net) {
 			//form_alternate_row('line' . $net['net_id'], true);
-			bdcom_form_alternate_row('line' . $net['net_id'], true, false, ($net["net_archive"] == 0 ? "" : "background-color:#bdbdbb"));
+			bdcom_form_alternate_row('line' . $net['net_id'], true, ($net["net_archive"] == 1), ($net["net_archive"] == 0 ? "" : "background-color:#bdbdbb"));
 			bdcom_format_netadd_row($net);
 
 		}
@@ -240,7 +274,9 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 	if (cacti_sizeof($nets)) {
 		print $nav;
 	}
-
+	
+	podkl_legend();
+	
 	/* draw the dropdown containing a list of available actions for this form */
 	draw_actions_dropdown($netadd_actions);
 
@@ -253,16 +289,24 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 
  function bdcom_format_netadd_row($net, $actions=false) {
 	global $config;
-		$row_bgcolor = ($net["net_archive"] == 0 ? ($net["net_gepon"] == 1 ? ($net["net_type"] == 2 ? "#76e7a5" : "#76d2e7") :"#e7e576") : "#bdbdbb");
+		$class_type = ($net["net_archive"] == 0 ? ($net["net_gepon"] == 1 ? ($net["net_type"] == 2 ? "podlkGepon" : "podlkMove2Gepon") :"podlkEthernet")  : "podklStatDone");
+		$class_status = ($net["net_archive"] == 0 ? ($net["net_do_status"] == 0 ? "podklStatWork" :"podklStatPause")  : "podklStatDone");
+		
+		
+		
+		
+		
+		
+		$row_bgcolor = ($net["net_archive"] == 0 ? ($net['net_do_status'] == 0 ? ($net["net_gepon"] == 1 ? ($net["net_type"] == 2 ? "#76e7a5" : "#76d2e7") :"#e7e576") : "#FFD700") : "#bdbdbb");
 		$ion_us_url = read_config_option("ion_us_adress");
 	
 		//$bgc = db_fetch_cell("SELECT hex FROM colors WHERE id='" . $net['color_row'] . "'");
-		form_selectable_cell($net['agr_date'], $net['net_id'],'',"background-color: " . $row_bgcolor . ";");
-		form_selectable_cell($net['ag_num'], $net['net_id'],'',"background-color: " . $row_bgcolor . ";");
+		form_selectable_cell($net['agr_date'], $net['net_id'],'',$class_type);
+		form_selectable_cell($net['ag_num'], $net['net_id'],'',$class_type);
 		form_selectable_cell("<a class='linkEditMain' href='bdcom_view_info.php?report=info&amp;device_id=-1&amp;ip_filter_type_id=2&amp;ip_filter=" . $net['ipa'] . "&amp;mac_filter_type_id=-1&amp;mac_filter=&amp;port_filter_type_id=&amp;port_filter=&amp;rows_selector=-1&amp;filter=&amp;page=1&amp;report=info&amp;x=14&amp;y=6'>" . 
 			(strlen(get_request_var('ip_filter')) ? strtoupper(preg_replace("/(" . preg_quote(get_request_var('ip_filter')) . ")/i", "<span style='background-color: #F8D93D;'>\\1</span>", $net['ipa'])) : $net['ipa']) . "</font></a>", $net['net_id']);		
 		
-		form_selectable_cell($net['net_ttl_date'], $net['net_id']);
+		form_selectable_cell(($net['net_do_status'] == 0 ? __('В работе', 'bdcom'):__('Пауза', 'bdcom')), $net['net_id'],'',$class_status);
 		
 		form_selectable_cell($net['net_uzelid'] <> '0' ? "<a href='" . $ion_us_url . "/oper/index.php?core_section=node&action=show&id=" . $net['net_uzelid'] . "' target='_blank'>Дом</a>, <a href='" . $ion_us_url . "/oper/index.php?core_section=map&action=show&&opt_wnode_4=1=1&opt_wc=1&by_node=" . $net['net_uzelid'] . "&is_show_center_marker=1' target='_blank'>карта</a>" : $net['net_uzelid'] , $net['net_id']);
 		form_selectable_cell($net['net_uzelid2'] <> '0' ? "<a href='" . $ion_us_url . "/oper/index.php?core_section=node&action=show&id=" . $net['net_uzelid2'] . "' target='_blank'>Бокс [" .  $net['net_uzelid2'] . "]</a>" : $net['net_uzelid2'], $net['net_id']);
@@ -282,6 +326,14 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 
 
 
+/* form_host_status_row_color - returns a color to use based upon the host's current status*/
+function bdcom_podlk_status_row_color($status, $disabled, $id) {
+
+
+	print "<tr class='tableRow selectable $class' id='line" . $id . "'>";
+
+	return $class;
+}
 
  
 
@@ -447,7 +499,7 @@ function bdcom_view_get_netadd_records(&$sql_where, $rows = '30', $apply_limits 
 
  
 function bdcom_netadd_filter() {
-	global $item_rows, $bdcom_search_types;
+	global $item_rows, $bdcom_search_types, $bdcom_search_nettype, $bdcom_search_adress;
 
 	?>
 	<td width="100%" valign="top"><?php bdcom_display_output_messages();?>
@@ -505,6 +557,30 @@ function bdcom_netadd_filter() {
 							?>
 						</select>
 					</td>
+					<td>
+						<?php print __('Type', 'bdcom');?>
+					</td>
+					<td>
+ 						<select id='net_type_id' onChange='applyFilter()'>
+ 						<?php
+ 						for($i=1;$i<=sizeof($bdcom_search_nettype);$i++) {
+ 							print "<option value='" . $i . "'"; if (get_request_var('net_type_id') == $i) { print " selected"; } print ">" . $bdcom_search_nettype[$i] . "</option>\n";
+ 						}
+ 						?>
+ 						</select>
+					</td>
+					<td>
+						<?php print __('Adress', 'bdcom');?>
+					</td>
+					<td>
+ 						<select id='net_adress_id' onChange='applyFilter()'>
+ 						<?php
+ 						for($i=1;$i<=sizeof($bdcom_search_adress);$i++) {
+ 							print "<option value='" . $i . "'"; if (get_request_var('net_adress_id') == $i) { print " selected"; } print ">" . $bdcom_search_adress[$i] . "</option>\n";
+ 						}
+ 						?>
+ 						</select>
+					</td>					
 				</tr>
 			</table>
 		</form>
@@ -514,6 +590,8 @@ function bdcom_netadd_filter() {
 			strURL += '&ip_filter_type_id=' + $('#ip_filter_type_id').val();
 			strURL += '&ip_filter=' + $('#ip_filter').val();
 			strURL += '&filter=' + $('#filter').val();
+			strURL += '&net_type_id=' + $('#net_type_id').val();
+			strURL += '&net_adress_id=' + $('#net_adress_id').val();
 			strURL += '&rows=' + $('#rows').val();
 			loadPageNoHeader(strURL);
 		}
